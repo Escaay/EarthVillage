@@ -22,10 +22,10 @@ export default function Edit({ navigation }: { navigation: any }) {
   const [ifShowCurrentAddressPicker, setIfShowCurrentAddressPicker] =
     useState(false);
   const clickSubmit = async () => {
-    console.log(form.getFieldsValue(true));
+    console.log(form.getFieldsValue());
     try {
       await form.validateFields();
-      setMyInfo(form.getFieldsValue(true));
+      setMyInfo(form.getFieldsValue());
       Toast.success('提交成功');
       await new Promise(resolve => setTimeout(resolve, 1000));
       navigation.goBack();
@@ -33,13 +33,11 @@ export default function Edit({ navigation }: { navigation: any }) {
       console.log(e);
     }
   };
-  const currentAddressOk = (value: any[]) => {
+  const currentAddressOk = () => {
     setIfShowCurrentAddressPicker(false);
-    form.setFieldValue('currentAddress', value);
   };
-  const originalAddressOk = (value: any[]) => {
+  const originalAddressOk = () => {
     setIfShowOriginalAddressPicker(false);
-    form.setFieldValue('originalAddress', value);
   };
 
   useEffect(() => {
@@ -79,31 +77,41 @@ export default function Edit({ navigation }: { navigation: any }) {
             <Input />
           </Form.Item>
 
-          <Picker
-            data={addressOptions}
-            visible={ifShowOriginalAddressPicker}
-            onDismiss={() => setIfShowOriginalAddressPicker(false)}
-            value={MyInfo.originalAddress}
-            onOk={originalAddressOk}>
-            <Form.Item
-              label="祖籍地"
-              onPress={() => {
-                setIfShowOriginalAddressPicker(true);
-              }}></Form.Item>
-          </Picker>
+          <Form.Item
+            label="现居地"
+            name="originalAddress"
+            onPress={() => {
+              setIfShowOriginalAddressPicker(true);
+            }}>
+            <Picker
+              data={addressOptions}
+              visible={ifShowOriginalAddressPicker}
+              onDismiss={() => setIfShowOriginalAddressPicker(false)}
+              onOk={originalAddressOk}>
+              <Form.Item
+                onPress={() => {
+                  setIfShowOriginalAddressPicker(true);
+                }}></Form.Item>
+            </Picker>
+          </Form.Item>
 
-          <Picker
-            data={addressOptions}
-            visible={ifShowCurrentAddressPicker}
-            onDismiss={() => setIfShowCurrentAddressPicker(false)}
-            value={form.getFieldValue('currentAddress')}
-            onOk={currentAddressOk}>
-            <Form.Item
-              label="现居地"
-              onPress={() => {
-                setIfShowCurrentAddressPicker(true);
-              }}></Form.Item>
-          </Picker>
+          <Form.Item
+            label="现居地"
+            name="currentAddress"
+            onPress={() => {
+              setIfShowCurrentAddressPicker(true);
+            }}>
+            <Picker
+              data={addressOptions}
+              visible={ifShowCurrentAddressPicker}
+              onDismiss={() => setIfShowCurrentAddressPicker(false)}
+              onOk={currentAddressOk}>
+              <Form.Item
+                onPress={() => {
+                  setIfShowCurrentAddressPicker(true);
+                }}></Form.Item>
+            </Picker>
+          </Form.Item>
           <Button onPress={clickSubmit}>提交</Button>
         </Form>
       </ScrollView>

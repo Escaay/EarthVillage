@@ -9,4 +9,4 @@
 - 6.babel-plugin-import 按需加载 antd react native 组件
 - 7.只在特定的页面展示 bottom tabBar, 参考：https://reactnavigation.org/docs/hiding-tabbar-in-screens
 
-- 8.antd mobile Picker 组件需要把 Form.Item 放在 Picker 里面，然后把 name 去掉自己接管，另外在 getFieldsValue 时需要用 form.getFieldsValue(true)加上 true 来获取非现存的字段
+- 8.antd mobile Picker 组件需要在 Picker 里面再套一个空的 Form.Item 元素来展示回显的元素
