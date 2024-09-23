@@ -1,12 +1,19 @@
-- 1.安装 android-studio 时无法勾选 android sdk platform
-  子目录下的 sdk35 和 platform 只能勾选一个，把子目录勾选去掉
-- 2.npx react-native doctor 找不到 android studio 或 Version found: N/A，参考https://blog.csdn.net/weixin_43665686/article/details/135495486，要装上command-line并配置环境变量，现在的sdk下已经没有tools文件夹了，不用配置tools环境变量
-- 3.npx react-native doctor 找不到 android studio 不用管，照样可以启动 npm run android
-- 4.reactnative-navigation 还需要额外安装依赖：npm install react-native-screens react-native-safe-area-context，再次启动时会卡在 gardle50%，要耐心等待起码十分钟
+- 1. 安装 android-studio 时无法勾选 android sdk platform,是因为子目录下的 sdk35 和 platform 只能勾选一个，把子目录勾选去掉
 
-- 5.reactNative 路由需要用 stack 或者 tab 包裹组件，然后在里面设定路由，和 web 端的路由方式不太一样，而且他的默认值是路由中包裹的第一个组件
+- 2. npx react-native doctor 找不到 android studio 或 Version found: N/A，参考https://blog.csdn.net/weixin_43665686/article/details/135495486，要装上command-line并配置环境变量，现在的sdk下已经没有tools文件夹了，不用配置tools环境变量
 
-- 6.babel-plugin-import 按需加载 antd react native 组件
-- 7.只在特定的页面展示 bottom tabBar, 参考：https://reactnavigation.org/docs/hiding-tabbar-in-screens
+- 3. npx react-native doctor 找不到 android studio 不用管，照样可以启动 npm run android
 
-- 8.antd mobile Picker 组件需要在 Picker 里面再套一个空的 Form.Item 元素来展示回显的元素
+- 4. reactnative-navigation 还需要额外安装依赖：npm install react-native-screens react-native-safe-area-context，再次启动时会卡在 gardle50%，要耐心等待起码十分钟
+
+- 5. reactNative 路由需要用 stack 或者 tab 包裹组件，然后在里面设定路由，和 web 端的路由方式不太一样，而且他的默认值是路由中包裹的第一个组件
+
+- 6. babel-plugin-import 按需加载 antd react native 组件
+
+- 7. 只在特定的页面展示 bottom tabBar, 参考：https://reactnavigation.org/docs/hiding-tabbar-in-screens
+
+- 8. antd mobile Picker 组件需要在 Picker 里面再套一个空的 Form.Item 元素来展示回显的元素
+
+- 9. antd mobile rn 需要关闭项目后运行 npx react-native-asset，否则 Toast 图标无效,icon 图标无效
+
+- 10. antd mobile rn 按需加载安装 babel-plugin-import 后，还需要配置.babelrc 和 react-native.config.js 两个文件
