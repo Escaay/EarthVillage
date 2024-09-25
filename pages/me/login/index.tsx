@@ -52,6 +52,9 @@ export default function Login() {
       } else {
         Toast.success(`登录失败,${res.message}`);
       }
+      // const res = await fetch('https://1258291989-2vrzc9e2n3.ap-guangzhou.tencentscf.com')
+      console.log('data', res.data);
+      console.log('status', res.status);
     } catch (e) {
       Toast.success(`登录失败,${e}`);
     }
