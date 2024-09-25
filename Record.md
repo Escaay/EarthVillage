@@ -22,4 +22,4 @@
 
 12. 调试工具使用npx react-native start --experimental-debugger启动项目，然后在终端先按a启动app，再按j启动new-debugger工具，方便查看输出
 
-13. rn无法在请求http的接口，所以无法本地测localhost
+13. rn无法在请求http的接口，所以无法本地测localhost,，但是可以在localhost启动server，然后用postman先把接口测试通过，再部署到云函数
