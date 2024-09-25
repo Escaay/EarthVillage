@@ -17,3 +17,5 @@
 - 9. antd mobile rn 需要关闭项目后运行 npx react-native-asset，否则 Toast 图标无效,icon 图标无效
 
 - 10. antd mobile rn 按需加载安装 babel-plugin-import 后，还需要配置.babelrc 和 react-native.config.js 两个文件
+
+11. 如果发现安装app失败的情况，先打开模拟器，再运行npm run android
