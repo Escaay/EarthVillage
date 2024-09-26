@@ -4,7 +4,7 @@ import { Button } from '@ant-design/react-native';
 import '../../assets/img/avatar.jpg';
 import Login from './login';
 import { useMyInfo } from '../../store/my-info';
-import { useLogin } from '../../store/login';
+import { useLogin, setLogin } from '../../store/login';
 import { useNavigation } from '@react-navigation/native';
 
 const styles = StyleSheet.create({
@@ -28,7 +28,7 @@ export default function SettingsScreen() {
   const clickEdit = () => navigation.navigate('Edit');
   return (
     <ScrollView contentContainerStyle={null}>
-      {login.userId ? (
+      {login.userName ? (
         <>
           <Image
             style={styles.tinyLogo}
@@ -40,6 +40,7 @@ export default function SettingsScreen() {
           <Text>祖籍地：{myInfo.originalAddress?.join('')}</Text>
           <Text>现居地：{myInfo.currentAddress?.join('')}</Text>
           <Button onPress={clickEdit}>编辑</Button>
+          <Button onPress={() => setLogin({ userName: '' })}>退出登录</Button>
         </>
       ) : (
         <Login />

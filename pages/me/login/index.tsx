@@ -9,8 +9,11 @@ import {
   Provider,
 } from '@ant-design/react-native';
 import axios from '../../../utils/axios';
+import sleep from '../../../utils/sleep';
 // import { useNavigation } from "@react-navigation/native";
 import type { Res } from '../../../types/axios';
+import { setLogin } from '../../../store/login';
+// import storage from '../../../utils/storage'
 
 const tabs = [
   {
@@ -26,37 +29,38 @@ export default function Login() {
   // const navigation = useNavigation<any>();
   const clickRegister = async () => {
     try {
-      const { userName: name, password } = loginForm.getFieldsValue();
+      const { userName, password } = registerForm.getFieldsValue();
       const res: Res = await axios.post('/user/register', {
-        name,
+        userName,
         password,
       });
-      if (res.status === 'success') {
+      console.log('data', res.data);
+      if (res.data.data === true) {
         Toast.success('注册成功');
       } else {
-        Toast.success(`注册失败,${res.message}`);
+        Toast.fail(`注册失败,${res.data.message}`);
       }
     } catch (e) {
-      Toast.success(`注册失败,${e}`);
+      Toast.fail(`请求失败,${e}`);
     }
   };
   const clickLogin = async () => {
     try {
-      const { userName: name, password } = loginForm.getFieldsValue();
+      const { userName, password } = loginForm.getFieldsValue();
       const res: Res = await axios.post('/user/login', {
-        name,
+        userName,
         password,
       });
-      if (res.status === 'success') {
+      if (res.data.data === true) {
         Toast.success('登录成功');
+        await sleep(1000);
+        setLogin({ userName });
       } else {
-        Toast.success(`登录失败,${res.message}`);
+        Toast.fail(`登录失败,${res.data.message}`);
       }
-      // const res = await fetch('https://1258291989-2vrzc9e2n3.ap-guangzhou.tencentscf.com')
       console.log('data', res.data);
-      console.log('status', res.status);
     } catch (e) {
-      Toast.success(`登录失败,${e}`);
+      Toast.fail(`登录失败,${e}`);
     }
   };
   return (
@@ -92,12 +96,12 @@ export default function Login() {
               rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            <Form.Item
+            {/* <Form.Item
               name="passwordRepeat"
               label="密码"
               rules={[{ required: true }]}>
               <Input placeholder="再次输入密码" />
-            </Form.Item>
+            </Form.Item> */}
             <Button onPress={clickRegister}>注册</Button>
           </Form>
         </Tabs>

@@ -1,7 +1,7 @@
 import { createMapperHooksStore } from '@extremelyjs/store';
 
 const loginStore = createMapperHooksStore<any>({
-  userId: '',
+  userName: '',
 });
 
 export const useLogin = loginStore.useStoreValue; // 监听state变化
