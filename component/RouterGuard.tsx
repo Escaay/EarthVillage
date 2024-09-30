@@ -8,6 +8,6 @@ export default (props: any) => {
     if (myInfo.isLogin === false) {
       navigation.replace('Login');
     }
-  }, [navigation, myInfo.isLogin]);
+  }, [myInfo, navigation]);
   return <>{myInfo.isLogin ? props.children : null}</>;
 };
