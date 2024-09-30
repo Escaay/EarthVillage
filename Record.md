@@ -12,7 +12,7 @@
 
 7. 只在特定的页面展示 bottom tabBar, 参考：https://reactnavigation.org/docs/hiding-tabbar-in-screens
 
-8. antd mobile Picker 组件需要在 Picker 里面再套一个空的 Form.Item 元素来展示回显的元素
+8. antd mobile Picker 组件放在Form.Item外面，然后在Form.Item中嵌套一个ValueText组件，参考pages/me/edit/index.tsx
 
 9. antd mobile rn 需要关闭项目后运行 npx react-native-asset，否则 Toast 图标无效,icon 图标无效
 
@@ -23,3 +23,5 @@
 12. 调试工具使用npx react-native start --experimental-debugger启动项目，然后在终端先按a启动app，再按j启动new-debugger工具，方便查看输出
 
 13. rn无法在请求http的接口，所以无法本地测localhost,，但是可以在localhost启动server，然后用postman先把接口测试通过，再部署到云函数
+
+14. 客户端搜索框在Tab页面，输入法会导致bottomBar顶起，所以一般会跳转到一个没有底部栏的页面进行搜索，并且展示搜索推荐
