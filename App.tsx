@@ -19,6 +19,11 @@ const RouterGuardWithOthers = () => (
     <Others></Others>
   </RouterGuard>
 );
+const RouterGuardWithFilter = () => (
+  <RouterGuard>
+    <Filter></Filter>
+  </RouterGuard>
+);
 function HomeTabsRouter() {
   return (
     <Tab.Navigator
@@ -72,7 +77,7 @@ export default function App() {
         <RouterStack.Screen
           options={{ headerShown: false }}
           name="Filter"
-          component={Filter}
+          component={RouterGuardWithFilter}
         />
         <RouterStack.Screen
           name="Others"
