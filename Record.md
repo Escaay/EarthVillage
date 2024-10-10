@@ -25,3 +25,10 @@
 13. rn无法在请求http的接口，所以无法本地测localhost,，但是可以在localhost启动server，然后用postman先把接口测试通过，再部署到云函数
 
 14. 客户端搜索框在Tab页面，输入法会导致bottomBar顶起，所以一般会跳转到一个没有底部栏的页面进行搜索，并且展示搜索推荐
+
+15. 本地调试请求localhost的时候，要和电脑处在同一局域网下面（同一个wifi）,而且要把baseURL的localhost改成命令行中ipconfig查询到的IPv4 地址 . . . . . . . . . . . . : （例如）192.168.1.103
+
+16. antd mobile rn的picker组件，可以3列变2列，但是不能变成1列，会报错，比如澳门只有一个地点，那么给他的children加一个元素
+17. 打包命令，进入/android目录，执行./gradlew assembleRelease
+
+18. 设置启动页，图标，APP名称教程：https://www.jianshu.com/p/727c6057fc0a
