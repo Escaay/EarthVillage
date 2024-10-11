@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { FlatList, View, Text, ScrollView } from 'react-native';
+import { FlatList, View, Text, ScrollView, Image } from 'react-native';
 import {
   Tabs,
   Card,
@@ -151,7 +151,7 @@ const UserItem = (props: any) => {
     <Card full>
       <Card.Header
         title={
-          <View style={{ height: 100 }}>
+          <View style={{ height: 100, justifyContent: 'center' }}>
             <View
               style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 13 }}>姓名：{name}</Text>
@@ -161,23 +161,35 @@ const UserItem = (props: any) => {
             <WhiteSpace size="xs" />
             <WhiteSpace size="xs" />
             <Text style={{ fontSize: 13 }}>
-              籍贯：{originalAddress?.join('-')}
+              籍贯：{originalAddress?.filter(item => item !== '全部').join('-')}
             </Text>
             <WhiteSpace size="xs" />
             <WhiteSpace size="xs" />
             <Text style={{ fontSize: 13 }}>
-              现居：{currentAddress?.join('-')}
+              现居：{currentAddress?.filter(item => item !== '全部').join('-')}
             </Text>
             <WhiteSpace size="xs" />
             <WhiteSpace size="xs" />
             <Text style={{ fontSize: 13 }}>目前状态：{status}</Text>
           </View>
         }
-        thumbStyle={{ width: 90, height: 90, borderRadius: 45 }}
         thumb={
-          avatarURL
-            ? avatarURL
-            : 'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp'
+          <Image
+            style={{
+              marginRight: 12,
+              width: 84,
+              height: 84,
+              margin: 'auto',
+              borderRadius: 20,
+            }}
+            source={
+              avatarURL
+                ? {
+                    uri: avatarURL,
+                  }
+                : require('../../assets/img/avatar.png')
+            }
+          />
         }
         // extra="this is extra"
       />
@@ -241,7 +253,6 @@ const UserItem = (props: any) => {
 };
 
 const tabsHeight = 40;
-console.log();
 const tabItemMinHeight = Math.floor(screenHeight - tabsHeight);
 const flatListMinHeight =
   screenHeight - basic.headerHeight - basic.tabBarHeight;
@@ -275,8 +286,19 @@ export default function Home() {
         try {
           const id = await storage.getItem('id');
           const res = await queryUserBasis({ id });
-          console.log('res.data', res.data);
-          setMyInfo(res.data);
+          const filterInfo = res.data.filterInfo;
+          setMyInfo({
+            ...res.data,
+            customTags: res.data.filterInfo.customTags ?? [],
+            originalAddress: res.data.currentAddress ?? [],
+            currentAddress: res.data.currentAddress ?? [],
+            filterInfo: {
+              ...filterInfo,
+              customTags: filterInfo.customTags ?? [],
+              originalAddress: filterInfo.currentAddress ?? [],
+              currentAddress: filterInfo.currentAddress ?? [],
+            },
+          });
         } catch (e) {
           console.log(e, 'e===');
         }

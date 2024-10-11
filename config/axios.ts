@@ -1,5 +1,7 @@
 export default {
-  baseURL: 'https://1258291989-2vrzc9e2n3.ap-guangzhou.tencentscf.com', // 线上联调
-  timeout: 1000,
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  baseURL: 'https://ev-server-whfmnthsix.cn-hangzhou.fcapp.run/api', // 线上联调
+  // baseURL: 'http://192.168.1.103:3000/api', // 本地联调
+  // baseURL: 'http://192.168.1.104:3000/api', // 本地联调
+  timeout: 10000,
+  headers: { 'Content-Type': 'application/json' },
 };

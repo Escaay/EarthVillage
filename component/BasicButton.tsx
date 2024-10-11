@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Text, Pressable, Dimensions } from 'react-native';
 import autoViewWidth from '../utils/autoViewWidth';
 import basic from '../config/basic';

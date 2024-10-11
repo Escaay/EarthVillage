@@ -32,3 +32,11 @@
 17. 打包命令，进入/android目录，执行./gradlew assembleRelease
 
 18. 设置启动页，图标，APP名称教程：https://www.jianshu.com/p/727c6057fc0a
+
+19. 安装打包后的app之后要重新调试，需要删除原来的app，不然启动不了调试版app
+
+20. 当使用transform的时候，用字符串分隔的形式，需要加百分号，用对象数组的形式，不需要加百分号
+    transform: 'translateX(-50%) translateY(-50%)'
+    transform: [{translateX: -50}, {translateY: -50}]
+
+21. 组件更新导致输入法被收起，是因为Input组件被整体更新了，导致失去了焦点，平时输入都是Input的value更新，不会导致Input整体更新，想象成Input里面还有Text，value变化更新Text，不会失去焦点

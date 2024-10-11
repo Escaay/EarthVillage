@@ -95,7 +95,6 @@ export default function InputUserInfo(props: any) {
     try {
       await form.validateFields();
       const fieldsValues = form.getFieldsValue();
-      // console.log(fieldsValues);
       const payload: any = {};
       for (let key in fieldsValues) {
         // 不为undefined的，放入payload，这里过滤undefined字段前后端都要做，保证不报错
@@ -118,7 +117,6 @@ export default function InputUserInfo(props: any) {
     try {
       await form.validateFields();
       const fieldsValues = form.getFieldsValue();
-      console.log(fieldsValues);
       const res = await updateUserBasis({
         ...fieldsValues,
         id: await storage.getItem('id'),
@@ -152,7 +150,7 @@ export default function InputUserInfo(props: any) {
     const { value = [], style } = props;
     return (
       <Text style={{ height: 40, lineHeight: 40, ...style }}>
-        {value.join('-')}
+        {value.filter(item => item !== '全部').join('-')}
       </Text>
     );
   };
@@ -190,8 +188,6 @@ export default function InputUserInfo(props: any) {
         height: 100,
         margin: 'auto',
         borderRadius: 50,
-        borderWidth: 1,
-        borderColor: 'pink',
       }}
       source={
         props.value

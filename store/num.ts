@@ -7,7 +7,6 @@
 // export default {
 //     setValue: (val: number) => {
 //         store = val
-//         console.log(store)
 //         runCallbacks()
 //     },
 //     subscribe: (callback: any) => {

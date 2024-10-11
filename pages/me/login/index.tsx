@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Dimensions, View, Text, Pressable } from 'react-native';
+import { login } from '../../../api/user';
 import {
   Button,
   Tabs,
@@ -16,11 +17,11 @@ import basic from '../../../config/basic';
 import BasicButton from '../../../component/BasicButton';
 import axios from '../../../utils/axios';
 import sleep from '../../../utils/sleep';
-// import { useNavigation } from "@react-navigation/native";
 import type { Res } from '../../../types/axios';
 import storage from '../../../utils/storage';
-import { setMyInfo } from '../../../store/my-info';
+import { setMyInfo, useMyInfo } from '../../../store/my-info';
 import HeaderBar from '../../../component/HeaderBar';
+import { setIsLogin } from '../../../store/islogin';
 
 enum Mode {
   LOGIN_WITH_PASSWORD = 0,
@@ -31,6 +32,7 @@ const screenHeight = Dimensions.get('window').height;
 const screenWidth = Dimensions.get('window').width;
 
 export default function Login(props: any) {
+  // 区分 me 和 others
   const { isMe = false } = props;
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
@@ -54,27 +56,13 @@ export default function Login(props: any) {
           return;
         }
         codeCountDownRef.current--;
-        console.log(codeCountDownRef.current);
         setCodeCountDown(codeCountDownRef.current);
       }, 1000);
     } catch (e) {
       Toast.fail(e as string);
     }
   };
-  const CodeInput = (props: any) => (
-    <>
-      <Text
-        style={{ position: 'absolute', right: 0, padding: 8 }}
-        onPress={clickGetCode}>
-        {codeCountDown === 60 ? '获取验证码' : `${codeCountDown}秒后重新获取`}
-      </Text>
-      <Input
-        placeholder="请输入验证码"
-        value={props.value}
-        style={{ ...inputStyle, width: screenWidth * 0.5 }}
-      />
-    </>
-  );
+
   useEffect(() => {
     // 中途退出清理定时器
     return () => {
@@ -82,23 +70,21 @@ export default function Login(props: any) {
     };
   }, []);
   const [mode, setMode] = useState<Mode>(Mode.LOGIN_WITH_PASSWORD);
-  // const navigation = useNavigation<any>();
   const phoneValidator: (...args: any[]) => any = (_, value, callback) => {
     const phoneRegExp = /^1(3[0-9]|5[0-3,5-9]|7[1-3,5-8]|8[0-9])\d{8}$/;
     if (phoneRegExp.test(value)) {
-      callback();
+      return Promise.resolve();
     } else {
-      callback(new Error('手机号格式错误'));
+      return Promise.reject(new Error('手机号格式错误'));
     }
   };
 
   const passwordValidator: (...args: any[]) => any = (_, value, callback) => {
     const passwordRegExp = /^[A-Za-z0-9@$!%*?&.]{6,}$/;
-    console.log(passwordRegExp.test(value));
     if (passwordRegExp.test(value)) {
-      callback();
+      return Promise.resolve();
     } else {
-      callback(new Error('长度至少为6'));
+      return Promise.reject(new Error('长度至少为6'));
     }
   };
 
@@ -109,56 +95,58 @@ export default function Login(props: any) {
   ) => {
     const password = registerForm.getFieldValue('password');
     if (password === value) {
-      callback();
+      return Promise.resolve();
     } else {
-      callback(new Error('两次输入密码不一致'));
+      return Promise.resolve(new Error('两次输入密码不一致'));
     }
   };
 
   const codeValidator: (...args: any[]) => any = (_, value, callback) => {
     const codeRegExp = /^\d{6}$/;
     if (codeRegExp.test(value)) {
-      callback();
+      return Promise.resolve();
     } else {
-      callback(new Error('验证码格式错误'));
+      return Promise.resolve(new Error('验证码格式错误'));
     }
   };
 
   const clickRegister = async () => {
-    await registerForm.validateFields();
     try {
-      const { userPhone, password } = registerForm.getFieldsValue();
-      const res: Res = await axios.post('/user/register', {
-        userPhone,
+      const { phone, password, code } = await registerForm.validateFields();
+      const res = await axios.post('/user/register', {
+        phone,
         password,
+        code,
       });
+      const { accessToken, refreshToken, id } = res.data;
       Toast.success('注册成功');
+      await storage.setItem('id', id);
+      await storage.setItem('accessToken', accessToken);
+      await storage.setItem('refreshToken', refreshToken);
+      await sleep(1000);
+      setIsLogin(true);
     } catch (e) {
-      Toast.fail(`请求失败,${e}`);
+      console.log('注册失败', e);
+      Toast.fail(`注册失败,${e}`);
     }
   };
-
   const clickLogin = async () => {
-    let ifValidatePass = false;
     try {
       await loginForm.validateFields();
-      ifValidatePass = true;
-      const { userPhone, password, code } = loginForm.getFieldsValue();
+      const { phone, password, code } = loginForm.getFieldsValue();
       const res: Res =
         mode === Mode.LOGIN_WITH_PASSWORD
-          ? await axios.post('/user/login_With_password', {
-              userPhone,
-              password,
-            })
-          : await axios.post('/user/login_with_code', {
-              userPhone,
-              code,
-            });
+          ? await login({ phone, password })
+          : await login({ phone, code });
       Toast.success('登录成功');
-      storage.setItem('token', res.data.token);
-      storage.setItem('refreshToekn', res.data.refreshToekn);
-      setMyInfo({ ...res.data.userInfo, isLogin: true });
+      const { accessToken, refreshToken, id } = res.data;
+      await storage.setItem('id', id);
+      await storage.setItem('accessToken', accessToken);
+      await storage.setItem('refreshToken', refreshToken);
+      await sleep(1000);
+      setIsLogin(true);
     } catch (e) {
+      console.log('登录失败', e);
       Toast.fail(`登录失败,${e}`);
     }
   };
@@ -190,20 +178,41 @@ export default function Login(props: any) {
           <>
             <Form form={loginForm} style={{ backgroundColor: 'white' }}>
               <Form.Item
-                name="userPhone"
+                name="phone"
                 style={{ paddingLeft: 20 }}
                 validateDebounce={1000}
                 rules={[{ required: true, validator: phoneValidator }]}>
                 <Input placeholder="请输入手机号" style={inputStyle} />
               </Form.Item>
               {mode === Mode.LOGIN_WITH_CODE ? (
-                <Form.Item
-                  name="code"
-                  rules={[{ required: true, validator: codeValidator }]}
-                  style={{ paddingLeft: 20 }}
-                  validateDebounce={1000}>
-                  <CodeInput></CodeInput>
-                </Form.Item>
+                <View>
+                  <Text
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 15,
+                      zIndex: 200,
+                      padding: 8,
+                    }}
+                    onPress={clickGetCode}>
+                    {codeCountDown === 60
+                      ? '获取验证码'
+                      : `${codeCountDown}秒后重新获取`}
+                  </Text>
+                  <Form.Item
+                    name="code"
+                    rules={[{ required: true, validator: codeValidator }]}
+                    style={{ paddingLeft: 20 }}
+                    validateDebounce={1000}>
+                    <Input
+                      placeholder="请输入验证码"
+                      value={props.value}
+                      // 不要忘了加onChang，才能自动接管
+                      onChange={props.onChange}
+                      style={{ ...inputStyle, width: screenWidth * 0.5 }}
+                    />
+                  </Form.Item>
+                </View>
               ) : (
                 <Form.Item
                   name="password"
@@ -228,7 +237,7 @@ export default function Login(props: any) {
         {mode === Mode.REGISTER ? (
           <Form form={registerForm}>
             <Form.Item
-              name="userPhone"
+              name="phone"
               rules={[{ required: true, validator: phoneValidator }]}
               style={{ paddingLeft: 20 }}
               validateDebounce={1000}>
@@ -248,13 +257,31 @@ export default function Login(props: any) {
               validateDebounce={1000}>
               <Input placeholder="再次输入密码" style={inputStyle} />
             </Form.Item>
-            <Form.Item
-              name="code"
-              rules={[{ required: true, validator: codeValidator }]}
-              style={{ paddingLeft: 20 }}
-              validateDebounce={1000}>
-              <CodeInput></CodeInput>
-            </Form.Item>
+
+            {/* 开通手机号后解开注释 */}
+            {/* <View>
+                  <Text
+                    style={{ position: 'absolute', right: 0, top: 15, zIndex: 200,  padding: 8 }}
+                    onPress={clickGetCode}>
+                    {codeCountDown === 60
+                      ? '获取验证码'
+                      : `${codeCountDown}秒后重新获取`}
+                  </Text>
+                  <Form.Item
+                    name="code"
+                    rules={[{ required: true, validator: codeValidator }]}
+                    style={{ paddingLeft: 20 }}
+                    validateDebounce={1000}>
+                    <Input
+                      placeholder="请输入验证码"
+                      value={props.value}
+                      // 不要忘了加onChang，才能自动接管
+                      onChange={props.onChange}
+                      style={{ ...inputStyle, width: screenWidth * 0.5 }}
+                    />
+                  </Form.Item>
+                </View> */}
+
             <WhiteSpace size="xl"></WhiteSpace>
             <BasicButton
               onPress={clickRegister}
@@ -292,7 +319,7 @@ export default function Login(props: any) {
           ) : null}
           {mode !== Mode.LOGIN_WITH_CODE ? (
             <Pressable
-              onPress={() => setMode(Mode.LOGIN_WITH_CODE)}
+              // onPress={() => setMode(Mode.LOGIN_WITH_CODE)}
               style={{
                 padding: 20,
                 marginHorizontal: 20,
@@ -302,10 +329,12 @@ export default function Login(props: any) {
               <Icon
                 name="mobile"
                 size="lg"
-                color={basic.themeColor}
+                // color={basic.themeColor}
+                color={'gray'}
                 style={{ marginBottom: 10 }}
               />
               <Text>验证码登录</Text>
+              <Text>(开发中)</Text>
             </Pressable>
           ) : null}
           {mode !== Mode.REGISTER ? (

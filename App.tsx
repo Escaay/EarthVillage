@@ -16,12 +16,12 @@ import RouterGuard from './component/RouterGuard';
 const RouterStack = createNativeStackNavigator();
 const RouterGuardWithOthers = () => (
   <RouterGuard>
-    <Others></Others>
+    <Others />
   </RouterGuard>
 );
 const RouterGuardWithFilter = () => (
   <RouterGuard>
-    <Filter></Filter>
+    <Filter />
   </RouterGuard>
 );
 function HomeTabsRouter() {

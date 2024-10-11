@@ -18,57 +18,39 @@ import { useRoute } from '@react-navigation/native';
 import randomInteger from '../utils/randomInteger';
 import tagRgbaColor from '../config/tagRgbaColor';
 import HeaderBar from '../component/HeaderBar';
-import { useMyInfo } from '../store/my-info';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-const randomRgbaColor = () => {
-  return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
-};
-export default function UserDetail(props: any) {
-  const { userName, isMe = false } = props;
+import { queryUserBasis } from '../api/user';
+// const randomRgbaColor = () => {
+//   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
+// };
+import { useMyInfo } from '../store/my-info';
+export default function UserDetail(props: { userId?: string }) {
+  // 没传userId就是自己的主页，后端直接通过token里面拿到id返回个人信息
+  const myInfo = useMyInfo();
+  const { userId = myInfo.id } = props;
+  const isMe = userId === myInfo.id;
   const navigation = useNavigation<any>();
   const clickSetting = () => {
     navigation.navigate('Setting');
   };
   const clickEdit = () => navigation.navigate('Edit');
-  const [userInfo, setUserInfo] = useState({
-    name: '地球人',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.jpg',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-    customTags: [
-      '前端开发工程师',
-      '王者荣耀',
-      '大学生',
-      '乒乓球',
-      'qq飞车',
-      '象棋',
-      '游泳',
-      '创造与魔法',
-      '旅游',
-    ],
-  });
-  const myInfo = useMyInfo();
+  const [userInfo, setUserInfo] = useState<any>({});
   useEffect(() => {
-    // mock
-    setUserInfo(myInfo);
-    // mock
-    // const asyncFn = async () => {
-    //   try {
-    //     const res = await axios.post('/user/single_basis', {userName})
-    //     setUserInfo(res.data.data)
-    //   } catch (e) {
-    //     console.log(e)
-    //   }
-    // }
-    // asyncFn()
-    // mock
-  }, [myInfo]);
-  // mock
-  // }, [])
+    const asyncFn = async () => {
+      try {
+        const res = await queryUserBasis({ id: userId });
+        setUserInfo(res.data);
+      } catch (e) {
+        console.log(e);
+      }
+    };
+
+    if (isMe) {
+      setUserInfo(myInfo);
+    } else {
+      asyncFn();
+    }
+  }, [userId, myInfo, isMe]);
 
   return (
     <ScrollView contentContainerStyle={{ zIndex: 1 }}>
@@ -99,22 +81,53 @@ export default function UserDetail(props: any) {
               height: 100,
               margin: 'auto',
               borderRadius: 50,
-              borderWidth: 1,
-              borderColor: 'pink',
             }}
-            source={require('../assets/img/avatar.jpg')}
+            source={
+              userInfo?.avatarURL
+                ? {
+                    uri: userInfo.avatarURL,
+                  }
+                : require('../assets/img/avatar.png')
+            }
           />
-          <WhiteSpace size="md" />
-          <WhiteSpace size="md" />
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-            <BasicButton backgroundColor="pink" wingBlank={40}>
-              交换微信
-            </BasicButton>
-            <BasicButton backgroundColor="orange" wingBlank={40}>
-              打个招呼
-            </BasicButton>
-          </View>
+          {isMe ? (
+            <>
+              <WhiteSpace size="md" />
+              <WhiteSpace size="md" />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-around',
+                }}>
+                <BasicButton
+                  backgroundColor="yellowgreen"
+                  wingBlank={40}
+                  onPress={clickEdit}>
+                  编辑资料
+                </BasicButton>
+                {/* <BasicButton backgroundColor="orange" wingBlank={40}>
+            编辑资料
+            </BasicButton> */}
+              </View>
+            </>
+          ) : (
+            <>
+              <WhiteSpace size="md" />
+              <WhiteSpace size="md" />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-around',
+                }}>
+                <BasicButton backgroundColor="pink" wingBlank={40}>
+                  交换微信
+                </BasicButton>
+                <BasicButton backgroundColor="orange" wingBlank={40}>
+                  打个招呼
+                </BasicButton>
+              </View>
+            </>
+          )}
           <WhiteSpace size="md" />
           <WhiteSpace size="md" />
           <View
@@ -124,19 +137,24 @@ export default function UserDetail(props: any) {
             <Text>性别：{userInfo.gender}</Text>
           </View>
           <WhiteSpace size="md" />
-          <Text>祖籍地：{userInfo.originalAddress?.join('')}</Text>
+          <Text>
+            籍贯：
+            {userInfo.originalAddress
+              ?.filter(item => item !== '全部')
+              .join('-')}
+          </Text>
           <WhiteSpace size="md" />
-          <Text>现居地：{userInfo.currentAddress?.join('')}</Text>
+          <Text>
+            现居：
+            {userInfo.currentAddress?.filter(item => item !== '全部').join('-')}
+          </Text>
           <WhiteSpace size="md" />
-          <Text>当前状态：{userInfo.status}</Text>
+          <Text>目前状态：{userInfo.status}</Text>
           <WhiteSpace size="md" />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {userInfo.customTags?.map((item, index) => (
-              <View>
-                <Tag
-                  key={item + String(index)}
-                  color={randomRgbaColor()}
-                  style={{ marginRight: 8 }}>
+            {userInfo.customTags?.map((item: string, index: number) => (
+              <View key={item}>
+                <Tag color={tagRgbaColor[index]} style={{ marginRight: 8 }}>
                   {item}
                 </Tag>
                 <WhiteSpace size="md" />
@@ -144,22 +162,6 @@ export default function UserDetail(props: any) {
             ))}
           </View>
           <WhiteSpace size="md" />
-          {isMe ? (
-            <>
-              <BasicButton
-                style={{ backgroundColor: 'yellowgreen' }}
-                onPress={clickEdit}>
-                编辑资料
-              </BasicButton>
-              {/* <BasicButton
-                backgroundColor="red"
-                fontSize={10}
-                type="warning"
-                onPress={() => setLogin({ userName: '' })}>
-                退出登录
-              </BasicButton> */}
-            </>
-          ) : null}
         </View>
       ) : (
         <Login />
