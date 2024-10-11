@@ -1,9 +1,10 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { ScrollView, Text, View, TextInput, Dimensions } from 'react-native';
 import { useMyInfo, setMyInfo } from '../store/my-info';
-import { useFilterInfo, setFilterInfo } from '../store/filter-info';
 import Tag from './Tag';
+import { Image } from 'react-native';
+import { updateUserBasis } from '../api/user';
 import {
   Button,
   Provider,
@@ -15,6 +16,9 @@ import {
   Stepper,
   WhiteSpace,
   SearchBar,
+  Modal,
+  Checkbox,
+  List,
 } from '@ant-design/react-native';
 import status from '../config/status';
 import HeaderBar from '../component/HeaderBar';
@@ -25,36 +29,31 @@ import { useNavigation } from '@react-navigation/native';
 import randomInteger from '../utils/randomInteger';
 import tagRgbaColor from '../config/tagRgbaColor';
 import axios from '../utils/axios';
+import storage from '../utils/storage';
+import { uploadSingleImg } from '../utils/imageUpload';
 // import numStore from '../store/num'
 
 enum Mode {
   EDIT = 'edit',
   FILTER = 'filter',
 }
-const randomRgbaColor = () => {
-  return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
-};
+// const randomRgbaColor = () => {
+//   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
+// };
 
 export default function InputUserInfo(props: any) {
   // const num = React.useSyncExternalStore(numStore.subscribe, numStore.snapshot)
   const { mode } = props;
   const [tagSearchVarValue, setTagSearchVarValue] = useState<any>();
-  let [test, setTest] = useState(1);
   const myInfo = useMyInfo();
-  const filterInfo = useFilterInfo();
-  const userInfo = mode === Mode.FILTER ? filterInfo : myInfo;
-  const setUserInfo = mode === Mode.FILTER ? setFilterInfo : setMyInfo;
-
+  const [ifShowModal, setIfShowModal] = useState(false);
+  const [filterConds, setFilterConds] = useState<string[]>([]);
   const clickCloseTag = (value: any) => {
-    setTest(randomInteger(0, 10));
     form.setFieldValue(
       'customTags',
       form.getFieldValue('customTags').filter((item: any) => item !== value),
     );
   };
-  useEffect(() => {
-    console.log('test');
-  }, [test]);
   const clickSearchBarAdd = (value: any) => {
     if (value === undefined || value === '') return Toast.fail('输入为空');
     if (form.getFieldValue('customTags').indexOf(value) !== -1)
@@ -70,10 +69,10 @@ export default function InputUserInfo(props: any) {
     return (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         {tagList.map((item: any, index: any) => (
-          <View>
+          <View key={item}>
             <Tag
               key={item + String(index)}
-              color={randomRgbaColor()}
+              color={tagRgbaColor[index]}
               ifShowClose={true}
               clickClose={() => clickCloseTag(item)}
               style={{ marginRight: 8 }}>
@@ -95,8 +94,21 @@ export default function InputUserInfo(props: any) {
   const clickSubmitInFilter = async () => {
     try {
       await form.validateFields();
-      const res = form.getFieldsValue();
-      setUserInfo(res);
+      const fieldsValues = form.getFieldsValue();
+      // console.log(fieldsValues);
+      const payload: any = {};
+      for (let key in fieldsValues) {
+        // 不为undefined的，放入payload，这里过滤undefined字段前后端都要做，保证不报错
+        if (fieldsValues[key] !== undefined) {
+          payload[key] = fieldsValues[key];
+        }
+      }
+      const res = await updateUserBasis({
+        id: myInfo.id,
+        filterInfo: payload,
+        filterConds,
+      });
+      setMyInfo(res.data);
       navigation.goBack();
     } catch (e) {
       Toast.fail(`保存失败,${e}`);
@@ -105,10 +117,13 @@ export default function InputUserInfo(props: any) {
   const clickSubmitInEdit = async () => {
     try {
       await form.validateFields();
-      const res = form.getFieldsValue();
-      await axios.post('user/update_basis', res);
-      const newMyInfo = await axios.post('user/single_basis', userInfo.id);
-      setMyInfo({ ...myInfo, ...newMyInfo });
+      const fieldsValues = form.getFieldsValue();
+      console.log(fieldsValues);
+      const res = await updateUserBasis({
+        ...fieldsValues,
+        id: await storage.getItem('id'),
+      });
+      setMyInfo(res.data);
       navigation.goBack();
     } catch (e) {
       Toast.fail(`保存失败,${e}`);
@@ -123,55 +138,125 @@ export default function InputUserInfo(props: any) {
     setIfShowOriginalAddressPicker(false);
   };
   const statusOk = (value: any[]) => {
-    console.log('value', value);
     form.setFieldValue('status', value);
     setIfShowStatusPicker(false);
   };
 
   useEffect(() => {
-    // mock
-    form.setFieldsValue(userInfo);
-    // mock
-
-    //后续要分别请求这两个的接口
-    // 用户的过滤信息
-    // 用户的个人信息（可以用全局)
-  }, [form, userInfo]);
+    setFilterConds([...myInfo.filterConds]);
+    // 这里myInfo无关的字段set进去了也没事，因为没有Form.Item,不会被getFieldsValue获取到
+    form.setFieldsValue(mode === Mode.FILTER ? myInfo.filterInfo : myInfo);
+  }, [form, myInfo, mode]);
 
   const ValueText = (props: any) => {
     const { value = [], style } = props;
     return (
-      <Text style={{ height: 40, lineHeight: 40, ...style }}>{value}</Text>
+      <Text style={{ height: 40, lineHeight: 40, ...style }}>
+        {value.join('-')}
+      </Text>
     );
   };
+
+  const clickFilterCondsCheck = (e: any, field: string) => {
+    if (e.target.checked === true) {
+      setFilterConds([
+        ...filterConds.filter((item: string) => item !== field),
+        field,
+      ]);
+    } else {
+      setFilterConds(filterConds.filter((item: string) => item !== field));
+    }
+  };
+
+  //   // 用他来包装FormItem里面的组件来添加额外元素，以便能够form能顺利接管
+  // const ValuePasser = (props: any) => {
+  //   console.log(props.children.props)
+  //   props.children.props.value = props.value
+  //   props.children.props.onChange = props.onChange
+  //   return (
+  //     <>
+  //       {props.children}
+  //       <Checkbox style={{position: 'absolute', right: -14}} defaultChecked={true}></Checkbox>
+  //     </>
+  //   )
+  // }
+  const { height: screenHeight } = Dimensions.get('window');
+  // 屏幕高度减去头部标题的高度，就是滚动区域的高度（主内容）
+  const scrollContainerHeight = screenHeight - basic.headerHeight;
+  const ImageUpload = (props: any) => (
+    <Image
+      style={{
+        width: 100,
+        height: 100,
+        margin: 'auto',
+        borderRadius: 50,
+        borderWidth: 1,
+        borderColor: 'pink',
+      }}
+      source={
+        props.value
+          ? {
+              uri: props.value,
+            }
+          : require('../assets/img/avatar.png')
+      }
+    />
+  );
+  const clickAvatarURL = async () => {
+    const img = await uploadSingleImg();
+    form.setFieldValue('avatarURL', `data:image/png;base64,${img.data}`);
+  };
+
   return (
     <Provider>
-      <ScrollView>
-        {/* <BasicButton onPress={() => numStore.setValue(randomInteger(0, 100))}>++</BasicButton> */}
-        {/* <Text>{num}</Text> */}
-        <Form form={form}>
-          <Form.Item
-            style={{ height: 40, backgroundColor: basic.backgroundColor }}
-            label={<Text style={{ fontSize: 16 }}>姓名</Text>}
-            name="name">
-            <Input
+      <ScrollView
+        style={{ height: scrollContainerHeight }}
+        contentContainerStyle={{ minHeight: scrollContainerHeight }}>
+        <Form
+          form={form}
+          style={{ flex: 9, backgroundColor: basic.backgroundColor }}>
+          {mode === Mode.EDIT ? (
+            <Form.Item
+              onPress={clickAvatarURL}
+              style={{ backgroundColor: basic.backgroundColor }}
+              name="avatarURL">
+              <ImageUpload />
+            </Form.Item>
+          ) : null}
+
+          {mode === Mode.EDIT ? (
+            <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              inputStyle={{ fontSize: 14, color: 'gray' }}
-            />
-          </Form.Item>
-          <Form.Item
-            style={{ height: 40, backgroundColor: basic.backgroundColor }}
-            label={<Text style={{ fontSize: 16 }}>性别</Text>}
-            name="gender">
-            <Radio.Group style={{ flexDirection: 'row', height: 40 }}>
-              <Radio value={'男'}>
-                <Text style={{ fontSize: 14 }}>男</Text>
-              </Radio>
-              <Radio value={'女'}>
-                <Text style={{ fontSize: 14 }}>女</Text>
-              </Radio>
-            </Radio.Group>
-          </Form.Item>
+              label={<Text style={{ fontSize: 16 }}>姓名</Text>}
+              name="name">
+              <Input
+                style={{ height: 40, backgroundColor: basic.backgroundColor }}
+                inputStyle={{ fontSize: 14, color: 'gray' }}
+              />
+            </Form.Item>
+          ) : null}
+
+          <View>
+            <Form.Item
+              style={{ height: 40, backgroundColor: basic.backgroundColor }}
+              label={<Text style={{ fontSize: 16 }}>性别</Text>}
+              name="gender">
+              <Radio.Group style={{ flexDirection: 'row', height: 40 }}>
+                <Radio value={'男'}>
+                  <Text style={{ fontSize: 14 }}>男</Text>
+                </Radio>
+                <Radio value={'女'}>
+                  <Text style={{ fontSize: 14 }}>女</Text>
+                </Radio>
+              </Radio.Group>
+            </Form.Item>
+            {mode === Mode.FILTER ? (
+              <Checkbox
+                checked={filterConds?.indexOf('gender') !== -1}
+                style={{ position: 'absolute', right: 0, top: 8 }}
+                onChange={e => clickFilterCondsCheck(e, 'gender')}></Checkbox>
+            ) : null}
+          </View>
           {mode === Mode.EDIT ? (
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
@@ -180,62 +265,107 @@ export default function InputUserInfo(props: any) {
               <Stepper max={150} min={0}></Stepper>
             </Form.Item>
           ) : null}
+
           {mode === Mode.FILTER ? (
             <>
-              <Form.Item
-                style={{ height: 40, backgroundColor: basic.backgroundColor }}
-                label={<Text style={{ fontSize: 16 }}>最小年龄</Text>}
-                name="minAge">
-                <Stepper max={150} min={0}></Stepper>
-              </Form.Item>
-              <Form.Item
-                style={{ height: 40, backgroundColor: basic.backgroundColor }}
-                label={<Text style={{ fontSize: 16 }}>最大年龄</Text>}
-                name="maxAge">
-                <Stepper max={150} min={0}></Stepper>
-              </Form.Item>
+              <View>
+                <Form.Item
+                  style={{ height: 40, backgroundColor: basic.backgroundColor }}
+                  label={<Text style={{ fontSize: 16 }}>最小年龄</Text>}
+                  name="minAge">
+                  <Stepper max={150} min={0}></Stepper>
+                </Form.Item>
+                <Checkbox
+                  checked={filterConds?.indexOf('minAge') !== -1}
+                  style={{ position: 'absolute', right: 0, top: 8 }}
+                  onChange={e => clickFilterCondsCheck(e, 'minAge')}></Checkbox>
+              </View>
+
+              <View>
+                <Form.Item
+                  style={{ height: 40, backgroundColor: basic.backgroundColor }}
+                  label={<Text style={{ fontSize: 16 }}>最大年龄</Text>}
+                  name="maxAge">
+                  <Stepper max={150} min={0}></Stepper>
+                </Form.Item>
+                <Checkbox
+                  checked={filterConds?.indexOf('maxAge') !== -1}
+                  style={{ position: 'absolute', right: 0, top: 8 }}
+                  onChange={e => clickFilterCondsCheck(e, 'maxAge')}></Checkbox>
+              </View>
             </>
           ) : null}
-          <Form.Item
-            style={{ height: 40, backgroundColor: basic.backgroundColor }}
-            label={<Text style={{ fontSize: 16 }}>祖籍地</Text>}
-            name="originalAddress"
-            onPress={() => {
-              setIfShowOriginalAddressPicker(true);
-            }}>
-            <ValueText></ValueText>
-          </Form.Item>
-          <Picker
-            value={form.getFieldValue('originalAddress')}
-            data={addressOptions}
-            visible={ifShowOriginalAddressPicker}
-            onDismiss={() => setIfShowOriginalAddressPicker(false)}
-            onOk={originalAddressOk}></Picker>
 
-          <Form.Item
-            style={{ height: 40, backgroundColor: basic.backgroundColor }}
-            label={<Text style={{ fontSize: 16 }}>现居地</Text>}
-            name="currentAddress"
-            onPress={() => {
-              setIfShowCurrentAddressPicker(true);
-            }}>
-            <ValueText></ValueText>
-          </Form.Item>
-          <Picker
-            data={addressOptions}
-            value={form.getFieldValue('currentAddress')}
-            visible={ifShowCurrentAddressPicker}
-            onDismiss={() => setIfShowCurrentAddressPicker(false)}
-            onOk={currentAddressOk}></Picker>
-          <Form.Item
-            style={{ height: 40, backgroundColor: basic.backgroundColor }}
-            label={<Text style={{ fontSize: 16 }}>当前状态</Text>}
-            name="status"
-            onPress={() => {
-              setIfShowStatusPicker(true);
-            }}>
-            <ValueText style={{ position: 'relative', left: 20 }}></ValueText>
-          </Form.Item>
+          <View>
+            <Form.Item
+              style={{ height: 40, backgroundColor: basic.backgroundColor }}
+              label={<Text style={{ fontSize: 16 }}>籍贯</Text>}
+              name="originalAddress"
+              onPress={() => {
+                setIfShowOriginalAddressPicker(true);
+              }}>
+              <ValueText></ValueText>
+            </Form.Item>
+            <Picker
+              value={form.getFieldValue('originalAddress')}
+              data={addressOptions}
+              visible={ifShowOriginalAddressPicker}
+              onDismiss={() => setIfShowOriginalAddressPicker(false)}
+              onOk={originalAddressOk}></Picker>
+            {mode === Mode.FILTER ? (
+              <Checkbox
+                checked={filterConds?.indexOf('originalAddress') !== -1}
+                style={{ position: 'absolute', right: 0, top: 8 }}
+                onChange={e =>
+                  clickFilterCondsCheck(e, 'originalAddress')
+                }></Checkbox>
+            ) : null}
+          </View>
+
+          <View>
+            <Form.Item
+              style={{ height: 40, backgroundColor: basic.backgroundColor }}
+              label={<Text style={{ fontSize: 16 }}>现居</Text>}
+              name="currentAddress"
+              onPress={() => {
+                setIfShowCurrentAddressPicker(true);
+              }}>
+              <ValueText></ValueText>
+            </Form.Item>
+            <Picker
+              data={addressOptions}
+              value={form.getFieldValue('currentAddress')}
+              visible={ifShowCurrentAddressPicker}
+              onDismiss={() => setIfShowCurrentAddressPicker(false)}
+              onOk={currentAddressOk}></Picker>
+            {mode === Mode.FILTER ? (
+              <Checkbox
+                checked={filterConds?.indexOf('currentAddress') !== -1}
+                style={{ position: 'absolute', right: 0, top: 8 }}
+                onChange={e =>
+                  clickFilterCondsCheck(e, 'currentAddress')
+                }></Checkbox>
+            ) : null}
+          </View>
+
+          <View>
+            <Form.Item
+              style={{ height: 40, backgroundColor: basic.backgroundColor }}
+              label={<Text style={{ fontSize: 16 }}>目前状态</Text>}
+              name="status"
+              onPress={() => {
+                setIfShowStatusPicker(true);
+              }}>
+              <ValueText style={{ position: 'relative', left: 20 }}></ValueText>
+            </Form.Item>
+            {mode === Mode.FILTER ? (
+              <Checkbox
+                checked={filterConds?.indexOf('status') !== -1}
+                style={{ position: 'absolute', right: 0, top: 8 }}
+                onChange={e => clickFilterCondsCheck(e, 'status')}></Checkbox>
+            ) : null}
+          </View>
+
           <Picker
             data={status}
             defaultValue={[]}
@@ -258,6 +388,49 @@ export default function InputUserInfo(props: any) {
             name="customTags">
             <TagList></TagList>
           </Form.Item>
+
+          {/* {isShowFormItem('filterConds') ? (
+            <>
+              <Modal
+                visible={ifShowModal}
+                transparent
+                closable
+                onClose={() => setIfShowModal(false)}>
+                <List>
+                  {filterCondsInit?.map((item: any) => (
+                    <List.Item key={item.field}>
+                      <Text
+                        style={{
+                          textAlign: 'center',
+                          position: 'relative',
+                          bottom: 1,
+                        }}>
+                        {item.label}
+                      </Text>
+                      <Checkbox
+                        checked={filterConds?.indexOf(item.field) !== -1}
+                        style={{ position: 'absolute', right: 0 }}
+                        onChange={e =>
+                          clickFilterCondsCheck(e, item.field)
+                        }></Checkbox>
+                    </List.Item>
+                  ))}
+                </List>
+              </Modal>
+              <BasicButton
+                onPress={() => setIfShowModal(true)}
+                mode="long"
+                style={{
+                  marginHorizontal: 'auto',
+                  backgroundColor: 'orange',
+                }}>
+                选择筛选条件
+              </BasicButton>
+              <WhiteSpace size="lg"></WhiteSpace>
+            </>
+          ) : null} */}
+        </Form>
+        <View style={{ flex: 1 }}>
           <BasicButton
             onPress={
               mode === Mode.FILTER ? clickSubmitInFilter : clickSubmitInEdit
@@ -266,7 +439,7 @@ export default function InputUserInfo(props: any) {
             style={{ marginHorizontal: 'auto' }}>
             保存
           </BasicButton>
-        </Form>
+        </View>
       </ScrollView>
     </Provider>
   );
