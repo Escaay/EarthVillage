@@ -1,6 +1,7 @@
 import axiosConfig from '../config/axios';
 import axios from 'axios';
 import storage from './storage';
+import sleep from './sleep';
 import { setMyInfo, useMyInfo } from '../store/my-info';
 import { setIsLogin } from '../store/islogin';
 const axiosInstance = axios.create(axiosConfig);
@@ -39,6 +40,8 @@ axiosInstance.interceptors.response.use(
       await storage.setItem('refreshToken', '');
       setIsLogin(false);
     }
+    console.log(response.config.url);
+    // 业务代码错误，非服务端错误，不重试，直接返回
     if (response.data.code !== 200) {
       return Promise.reject(response.data.message);
     }
@@ -49,11 +52,34 @@ axiosInstance.interceptors.response.use(
       await storage.setItem('refreshToken', response.headers.refreshToken);
     return response.data;
   },
-  function (error) {
+  async function (err) {
     // 超出 2xx 范围的状态码都会触发该函数。
-    // 对响应错误做点什么
-    console.log('error', error);
-    return Promise.reject(error);
+    // 失败自动重试
+    var config = err.config;
+    // 如果配置不存在或未设置重试选项，则拒绝
+    if (!config || !config.retry) return Promise.reject(err);
+
+    // 设置变量以跟踪重试次数
+    config.__retryCount = config.__retryCount || '0';
+
+    // 判断是否超过总重试次数
+    if (+config.__retryCount >= +config.retry) {
+      // 返回错误并退出自动重试
+      console.log('重试次数已用尽', err);
+      return Promise.reject(err);
+    }
+
+    // 增加重试次数
+    config.__retryCount = +config.__retryCount + 1;
+
+    //打印当前重试次数
+    console.log(config.url + ' 自动重试第' + config.__retryCount + '次');
+
+    // 创建新的Promise
+    await sleep(config.retryDelay);
+
+    // 要用实例后的axios重新请求，不然重试后的请求无法经过拦截器
+    return axiosInstance(config);
   },
 );
 export default axiosInstance;

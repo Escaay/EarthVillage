@@ -22,6 +22,7 @@ import axios from '../../utils/axios';
 import { setIsLogin, useIsLogin } from '../../store/islogin';
 import storage from '../../utils/storage';
 import { queryFilterList, queryUserBasis } from '../../api/user';
+import sleep from '../../utils/sleep';
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const tabs = [
   {
@@ -29,108 +30,6 @@ const tabs = [
   },
   {
     title: '自定义',
-  },
-];
-
-const mockUserList = [
-  {
-    id: '1',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '2',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '3',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '4',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '5',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '6',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '7',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '8',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
-  },
-  {
-    id: '9',
-    avatarURL:
-      'https://p6-passport.byteacctimg.com/img/mosaic-legacy/3795/3044413937~80x80.awebp',
-    name: '地球人',
-    gender: '男',
-    age: 999,
-    originalAddress: ['广东省', '深圳市', '大鹏新区'],
-    currentAddress: ['广东省', '深圳市', '大鹏新区'],
-    status: '程序员',
   },
 ];
 
@@ -289,7 +188,7 @@ export default function Home() {
           const filterInfo = res.data.filterInfo;
           setMyInfo({
             ...res.data,
-            customTags: res.data.filterInfo.customTags ?? [],
+            customTags: res.data.customTags ?? [],
             originalAddress: res.data.currentAddress ?? [],
             currentAddress: res.data.currentAddress ?? [],
             filterInfo: {
@@ -299,9 +198,7 @@ export default function Home() {
               currentAddress: filterInfo.currentAddress ?? [],
             },
           });
-        } catch (e) {
-          console.log(e, 'e===');
-        }
+        } catch (e) {}
       };
       helper();
     }
@@ -346,7 +243,9 @@ export default function Home() {
           setIsRecommandListLoading(false);
         }
       } catch (e) {
-        console.log(e);
+        // sleep(1000).then(() => {
+        //   helper()
+        // })
       }
     };
     helper();

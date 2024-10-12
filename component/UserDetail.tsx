@@ -40,9 +40,7 @@ export default function UserDetail(props: { userId?: string }) {
       try {
         const res = await queryUserBasis({ id: userId });
         setUserInfo(res.data);
-      } catch (e) {
-        console.log(e);
-      }
+      } catch (e) {}
     };
 
     if (isMe) {

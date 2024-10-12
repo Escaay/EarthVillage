@@ -127,7 +127,7 @@ export default function Login(props: any) {
       setIsLogin(true);
     } catch (e) {
       console.log('注册失败', e);
-      Toast.fail(`注册失败,${e}`);
+      Toast.fail(`注册失败`);
     }
   };
   const clickLogin = async () => {
