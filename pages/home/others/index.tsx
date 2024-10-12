@@ -3,5 +3,5 @@ import UserDetail from '../../../component/UserDetail';
 import { useRoute } from '@react-navigation/native';
 export default function Others(props: any) {
   const route = useRoute<any>();
-  return <UserDetail userId={route.params.userId} />;
+  return <UserDetail userItem={route.params.userItem} />;
 }

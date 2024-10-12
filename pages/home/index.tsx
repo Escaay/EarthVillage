@@ -23,6 +23,7 @@ import { setIsLogin, useIsLogin } from '../../store/islogin';
 import storage from '../../utils/storage';
 import { queryFilterList, queryUserBasis } from '../../api/user';
 import sleep from '../../utils/sleep';
+import useUpdateEffect from '../../utils/useUpdateEffect';
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const tabs = [
   {
@@ -141,7 +142,9 @@ const UserItem = (props: any) => {
             <BasicButton
               backgroundColor="yellowgreen"
               wingBlank={40}
-              onPress={() => navigation.navigate('Others', { userId: id })}>
+              onPress={() =>
+                navigation.navigate('Others', { userItem: props.userData })
+              }>
               查看主页
             </BasicButton>
           </View>
@@ -179,7 +182,7 @@ export default function Home() {
   }, []);
 
   // 在这里监听相当于全局监听isLogin的回调，因为home这个组件永远都在
-  useEffect(() => {
+  useUpdateEffect(() => {
     if (isLogin === true) {
       const helper = async () => {
         try {
@@ -205,7 +208,7 @@ export default function Home() {
   }, [isLogin]);
 
   // myInfo挂钩isLogin, filterList和recommandList挂钩myInfo
-  useEffect(() => {
+  useUpdateEffect(() => {
     const helper = async () => {
       try {
         // 未登录直接返回所有数据

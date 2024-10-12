@@ -24,37 +24,21 @@ import { queryUserBasis } from '../api/user';
 //   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
 // };
 import { useMyInfo } from '../store/my-info';
-export default function UserDetail(props: { userId?: string }) {
+export default function UserDetail({ userItem }: { userItem: any }) {
   // 没传userId就是自己的主页，后端直接通过token里面拿到id返回个人信息
   const myInfo = useMyInfo();
-  const { userId = myInfo.id } = props;
-  const isMe = userId === myInfo.id;
+  const isMe = userItem.id === myInfo.id;
   const navigation = useNavigation<any>();
   const clickSetting = () => {
     navigation.navigate('Setting');
   };
   const clickEdit = () => navigation.navigate('Edit');
-  const [userInfo, setUserInfo] = useState<any>({});
-  useEffect(() => {
-    const asyncFn = async () => {
-      try {
-        const res = await queryUserBasis({ id: userId });
-        setUserInfo(res.data);
-      } catch (e) {}
-    };
-
-    if (isMe) {
-      setUserInfo(myInfo);
-    } else {
-      asyncFn();
-    }
-  }, [userId, myInfo, isMe]);
 
   return (
     <ScrollView contentContainerStyle={{ zIndex: 1 }}>
-      {/* HeaderBar放在这里是因为没有在外面的页面就拿到userInfo，这里需要name作为HeaderBar标题 */}
+      {/* HeaderBar放在这里是因为没有在外面的页面就拿到userItem，这里需要name作为HeaderBar标题 */}
       {!isMe ? (
-        <HeaderBar text={userInfo.name + '的主页'} />
+        <HeaderBar text={userItem.name + '的主页'} />
       ) : (
         <HeaderBar
           showBack={false}
@@ -81,9 +65,9 @@ export default function UserDetail(props: { userId?: string }) {
               borderRadius: 50,
             }}
             source={
-              userInfo?.avatarURL
+              userItem?.avatarURL
                 ? {
-                    uri: userInfo.avatarURL,
+                    uri: userItem.avatarURL,
                   }
                 : require('../assets/img/avatar.png')
             }
@@ -130,27 +114,27 @@ export default function UserDetail(props: { userId?: string }) {
           <WhiteSpace size="md" />
           <View
             style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text>姓名：{userInfo.name}</Text>
-            <Text>年龄：{userInfo.age}</Text>
-            <Text>性别：{userInfo.gender}</Text>
+            <Text>姓名：{userItem.name}</Text>
+            <Text>年龄：{userItem.age}</Text>
+            <Text>性别：{userItem.gender}</Text>
           </View>
           <WhiteSpace size="md" />
           <Text>
             籍贯：
-            {userInfo.originalAddress
+            {userItem.originalAddress
               ?.filter(item => item !== '全部')
               .join('-')}
           </Text>
           <WhiteSpace size="md" />
           <Text>
             现居：
-            {userInfo.currentAddress?.filter(item => item !== '全部').join('-')}
+            {userItem.currentAddress?.filter(item => item !== '全部').join('-')}
           </Text>
           <WhiteSpace size="md" />
-          <Text>目前状态：{userInfo.status}</Text>
+          <Text>目前状态：{userItem.status}</Text>
           <WhiteSpace size="md" />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {userInfo.customTags?.map((item: string, index: number) => (
+            {userItem.customTags?.map((item: string, index: number) => (
               <View key={item}>
                 <Tag color={tagRgbaColor[index]} style={{ marginRight: 8 }}>
                   {item}
