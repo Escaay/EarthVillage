@@ -1,21 +1,27 @@
-var ws = new WebSocket('ws://host.com/path');
+import websocketConfig from '../config/websocket';
+console.log(`ws://${websocketConfig.host}/user/wsConnect`);
+const wsConnect = () => {
+  const ws = new WebSocket(`ws://${websocketConfig.host}/user/wsConnect`);
 
-ws.onopen = () => {
-  // connection opened
-  ws.send('something'); // send a message
-};
+  ws.onopen = () => {
+    console.log('WebSocket connection opened');
+    ws.send('Hello, server!');
+  };
 
-ws.onmessage = e => {
-  // a message was received
-  console.log(e.data);
-};
+  ws.onmessage = event => {
+    console.log('Message from server:', event.data);
+  };
 
-ws.onerror = e => {
-  // an error occurred
-  console.log(e.message);
-};
+  ws.onclose = () => {
+    console.log('WebSocket connection closed');
+  };
 
-ws.onclose = e => {
-  // connection closed
-  console.log(e.code, e.reason);
+  ws.onerror = error => {
+    console.error('WebSocket error:', error);
+  };
+  return {
+    // 清理函数，在组件卸载时关闭 WebSocket 连接
+    close: () => ws.close(),
+  };
 };
+export default wsConnect;
