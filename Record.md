@@ -40,3 +40,5 @@
     transform: [{translateX: -50}, {translateY: -50}]
 
 21. 组件更新导致输入法被收起，是因为Input组件被整体更新了，导致失去了焦点，平时输入都是Input的value更新，不会导致Input整体更新，想象成Input里面还有Text，value变化更新Text，不会失去焦点
+
+22. /^[A-Za-z0-9@$!%*?&.]{6,}$/.test(undefined)输入为true，因为undefined会被转换为'undefined'
