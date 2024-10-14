@@ -12,7 +12,9 @@ import Others from './pages/home/others';
 import Login from './pages/me/login';
 import basic from './config/basic';
 import Setting from './pages/me/setting';
+import Chat from './pages/chat';
 import RouterGuard from './component/RouterGuard';
+import ChatDetail from './pages/chat/chatDetail.tsx';
 const RouterStack = createNativeStackNavigator();
 const RouterGuardWithOthers = () => (
   <RouterGuard>
@@ -24,9 +26,15 @@ const RouterGuardWithFilter = () => (
     <Filter />
   </RouterGuard>
 );
+const RouterGuardWithChatDetail = () => (
+  <RouterGuard>
+    <ChatDetail />
+  </RouterGuard>
+);
 function HomeTabsRouter() {
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         tabBarStyle: { height: basic.tabBarHeight },
         tabBarIcon: ({ focused, color, size }) => {
@@ -35,7 +43,9 @@ function HomeTabsRouter() {
           if (route.name === 'Home') {
             iconName = 'twitter';
           } else if (route.name === 'Me') {
-            iconName = 'qq';
+            iconName = 'aliwangwang';
+          } else if (route.name === 'Chat') {
+            iconName = 'message';
           }
 
           return <Icon name={iconName} size={size} color={color} />;
@@ -44,16 +54,22 @@ function HomeTabsRouter() {
         tabBarInactiveTintColor: 'gray',
       })}>
       <Tab.Screen
-        name="Home"
-        options={{ title: '主页', headerShown: false }}
-        component={Home}
-      />
-      {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
-      <Tab.Screen
         name="Me"
-        options={{ title: '自己', headerShown: false }}
+        options={{ title: '我', headerShown: false }}
         component={Me}
       />
+      <Tab.Screen
+        name="Home"
+        options={{ title: '发现', headerShown: false }}
+        component={Home}
+      />
+      <Tab.Screen
+        name="Chat"
+        options={{ title: '消息', headerShown: false }}
+        component={Chat}
+      />
+
+      {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
     </Tab.Navigator>
   );
 }
@@ -93,6 +109,11 @@ export default function App() {
           options={{ headerShown: false }}
           name="Setting"
           component={Setting}
+        />
+        <RouterStack.Screen
+          options={{ headerShown: false }}
+          name="ChatDetail"
+          component={RouterGuardWithChatDetail}
         />
       </RouterStack.Navigator>
     </NavigationContainer>
