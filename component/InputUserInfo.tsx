@@ -1,10 +1,11 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { ScrollView, Text, View, TextInput, Dimensions } from 'react-native';
-import { useMyInfo, setMyInfo } from '../store/my-info';
+import { useMyInfo, setMyInfo } from '../store/myInfo';
 import Tag from './Tag';
 import { Image } from 'react-native';
 import { updateUserBasis } from '../api/user';
+import DefaultText from './DefaultText';
 import {
   Button,
   Provider,
@@ -21,7 +22,6 @@ import {
   List,
 } from '@ant-design/react-native';
 import status from '../config/status';
-import HeaderBar from '../component/HeaderBar';
 import addressOptions from '../config/address-options';
 import BasicButton from '../component/BasicButton';
 import basic from '../config/basic';
@@ -51,17 +51,14 @@ export default function InputUserInfo(props: any) {
   const clickCloseTag = (value: any) => {
     form.setFieldValue(
       'customTags',
-      form.getFieldValue('customTags').filter((item: any) => item !== value),
+      form.getFieldValue('customTags')?.filter((item: any) => item !== value),
     );
   };
   const clickSearchBarAdd = (value: any) => {
     if (value === undefined || value === '') return Toast.fail('输入为空');
-    if (form.getFieldValue('customTags').indexOf(value) !== -1)
-      return Toast.fail('添加重复标签');
-    form.setFieldValue(
-      'customTags',
-      form.getFieldValue('customTags').concat(value),
-    );
+    const customTags = form.getFieldValue('customTags') ?? [];
+    if (customTags.indexOf(value) !== -1) return Toast.fail('添加重复标签');
+    form.setFieldValue('customTags', customTags.concat(value));
     setTagSearchVarValue(undefined);
   };
   const TagList = (props: any) => {
@@ -119,7 +116,7 @@ export default function InputUserInfo(props: any) {
       const fieldsValues = form.getFieldsValue();
       const res = await updateUserBasis({
         ...fieldsValues,
-        id: await storage.getItem('id'),
+        id: myInfo.id,
       });
       setMyInfo(res.data);
       navigation.goBack();
@@ -149,9 +146,9 @@ export default function InputUserInfo(props: any) {
   const ValueText = (props: any) => {
     const { value = [], style } = props;
     return (
-      <Text style={{ height: 40, lineHeight: 40, ...style }}>
+      <DefaultText style={{ height: 40, lineHeight: 40, ...style }}>
         {value.filter(item => item !== '全部').join('-')}
-      </Text>
+      </DefaultText>
     );
   };
 
@@ -199,8 +196,10 @@ export default function InputUserInfo(props: any) {
     />
   );
   const clickAvatarURL = async () => {
-    const img = await uploadSingleImg();
-    form.setFieldValue('avatarURL', `data:image/png;base64,${img.data}`);
+    try {
+      const img = await uploadSingleImg(false, 1000, 1000);
+      form.setFieldValue('avatarURL', `data:image/png;base64,${img.data}`);
+    } catch (e) {}
   };
 
   return (
@@ -223,7 +222,7 @@ export default function InputUserInfo(props: any) {
           {mode === Mode.EDIT ? (
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>姓名</Text>}
+              label={<DefaultText style={{ fontSize: 16 }}>姓名</DefaultText>}
               name="name">
               <Input
                 style={{ height: 40, backgroundColor: basic.backgroundColor }}
@@ -235,14 +234,14 @@ export default function InputUserInfo(props: any) {
           <View>
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>性别</Text>}
+              label={<DefaultText style={{ fontSize: 16 }}>性别</DefaultText>}
               name="gender">
               <Radio.Group style={{ flexDirection: 'row', height: 40 }}>
                 <Radio value={'男'}>
-                  <Text style={{ fontSize: 14 }}>男</Text>
+                  <DefaultText style={{ fontSize: 14 }}>男</DefaultText>
                 </Radio>
                 <Radio value={'女'}>
-                  <Text style={{ fontSize: 14 }}>女</Text>
+                  <DefaultText style={{ fontSize: 14 }}>女</DefaultText>
                 </Radio>
               </Radio.Group>
             </Form.Item>
@@ -256,7 +255,7 @@ export default function InputUserInfo(props: any) {
           {mode === Mode.EDIT ? (
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>年龄</Text>}
+              label={<DefaultText style={{ fontSize: 16 }}>年龄</DefaultText>}
               name="age">
               <Stepper max={150} min={0}></Stepper>
             </Form.Item>
@@ -267,7 +266,9 @@ export default function InputUserInfo(props: any) {
               <View>
                 <Form.Item
                   style={{ height: 40, backgroundColor: basic.backgroundColor }}
-                  label={<Text style={{ fontSize: 16 }}>最小年龄</Text>}
+                  label={
+                    <DefaultText style={{ fontSize: 16 }}>最小年龄</DefaultText>
+                  }
                   name="minAge">
                   <Stepper max={150} min={0}></Stepper>
                 </Form.Item>
@@ -280,7 +281,9 @@ export default function InputUserInfo(props: any) {
               <View>
                 <Form.Item
                   style={{ height: 40, backgroundColor: basic.backgroundColor }}
-                  label={<Text style={{ fontSize: 16 }}>最大年龄</Text>}
+                  label={
+                    <DefaultText style={{ fontSize: 16 }}>最大年龄</DefaultText>
+                  }
                   name="maxAge">
                   <Stepper max={150} min={0}></Stepper>
                 </Form.Item>
@@ -295,7 +298,7 @@ export default function InputUserInfo(props: any) {
           <View>
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>籍贯</Text>}
+              label={<DefaultText style={{ fontSize: 16 }}>籍贯</DefaultText>}
               name="originalAddress"
               onPress={() => {
                 setIfShowOriginalAddressPicker(true);
@@ -321,7 +324,7 @@ export default function InputUserInfo(props: any) {
           <View>
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>现居</Text>}
+              label={<DefaultText style={{ fontSize: 16 }}>现居</DefaultText>}
               name="currentAddress"
               onPress={() => {
                 setIfShowCurrentAddressPicker(true);
@@ -347,7 +350,9 @@ export default function InputUserInfo(props: any) {
           <View>
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<Text style={{ fontSize: 16 }}>目前状态</Text>}
+              label={
+                <DefaultText style={{ fontSize: 16 }}>目前状态</DefaultText>
+              }
               name="status"
               onPress={() => {
                 setIfShowStatusPicker(true);
@@ -395,14 +400,14 @@ export default function InputUserInfo(props: any) {
                 <List>
                   {filterCondsInit?.map((item: any) => (
                     <List.Item key={item.field}>
-                      <Text
+                      <DefaultText
                         style={{
                           textAlign: 'center',
                           position: 'relative',
                           bottom: 1,
                         }}>
                         {item.label}
-                      </Text>
+                      </DefaultText>
                       <Checkbox
                         checked={filterConds?.indexOf(item.field) !== -1}
                         style={{ position: 'absolute', right: 0 }}
