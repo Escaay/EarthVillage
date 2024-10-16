@@ -11,183 +11,35 @@ import HeaderBar from '../../component/HeaderBar';
 import { useChatList, setChatList } from '../../store/chatList';
 import useUpdateEffect from '../../utils/useUpdateEffect';
 import { useNavigation } from '@react-navigation/native';
-import { queryChatDetail } from '../../api/user';
-import { query } from 'express';
 import randomInteger from '../../utils/randomInteger';
+import { useMessagesList } from '../../store/messagesList';
+import DefaultText from '../../component/DefaultText';
+import { useUserId } from '../../store/userId';
 export default function Chat(props: any) {
   const navigation = useNavigation<any>();
   const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
   const myInfo = useMyInfo();
-  const isLogin = !!myInfo.id;
-  const [isChatListRefreshing, setIsChatListRefreshing] = useState(true);
+  const isLogin = !!useUserId();
+  const [isChatListRefreshing, setIsChatListRefreshing] = useState(false);
   const chatListMinHeight = screenHeight - basic.headerHeight;
   const chatList = useChatList();
   const chatListRef = useRef<any>();
   const refreshChatList = async () => {
     setIsChatListRefreshing(true);
-    const chatListRes = await queryChatList({ id: myInfo.id });
+    const chatListRes = await queryChatList({ userId: myInfo.id });
     setChatList(chatListRes.data);
     setIsChatListRefreshing(false);
   };
-  const mockChatList = [
-    {
-      chatId: '123',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '12ff23r',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '2141asf24',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214gadg124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '2141agag24',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214asff124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214fgfs124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214afaf124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '21bfdf4124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '2141agadga24',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214vbfw124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214asfaf124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-    {
-      chatId: '214aadga124',
-      userId: '1234',
-      partnerId: '12345',
-      partnerAvatarURL: '',
-      partnerName: '开发中',
-      lastMessageId: '1244',
-      lastMessage: '开发中',
-      unReadCount: 3,
-      lastMessageTime: 13717125,
-    },
-  ];
-  useEffect(() => {
-    // refreshChatList()
-    setIsChatListRefreshing(true);
-    setChatList(mockChatList);
-    setIsChatListRefreshing(false);
-  }, [myInfo]);
+  const messagesList = useMessagesList();
+
   const CHAR_ITEM_HEIGTH = 80;
-  const clickChatItem = async (chatId: string) => {
-    try {
-      const res = await queryChatDetail({ chatId });
-      navigation.navigate('ChatDetail', { chatDetail: res.data });
-    } catch (e) {}
-  };
-  const ChatItem = ({ data }: { data: any }) => {
+
+  const ChatItem = ({ chatItemData }: { chatItemData: any }) => {
+    const clickChatItem = async () => {
+      try {
+        navigation.navigate('ChatDetail', { chatItemData });
+      } catch (e) {}
+    };
     return (
       <Pressable
         style={{
@@ -195,7 +47,7 @@ export default function Chat(props: any) {
           height: CHAR_ITEM_HEIGTH,
           paddingVertical: 10,
         }}
-        onPress={() => clickChatItem(data.chatId)}>
+        onPress={() => clickChatItem()}>
         <View
           style={{ flex: 2, justifyContent: 'center', alignItems: 'center' }}>
           <Image
@@ -205,32 +57,53 @@ export default function Chat(props: any) {
               borderRadius: 30,
             }}
             source={
-              data?.avatarURL
+              chatItemData?.partnerAvatarURL
                 ? {
-                    uri: data.avatarURL,
+                    uri: chatItemData.partnerAvatarURL,
                   }
                 : require('../../assets/img/avatar.png')
             }
           />
         </View>
         <View style={{ flex: 6, paddingHorizontal: 5 }}>
-          <Text
+          <DefaultText
             style={{
               color: 'black',
               fontWeight: 800,
               marginBottom: 10,
               fontSize: 14,
             }}>
-            {data.partnerName}
-          </Text>
-          <Text style={{ color: 'gray', fontSize: 12 }}>
-            {data.lastMessage}
-          </Text>
+            {chatItemData.partnerName}
+          </DefaultText>
+          <DefaultText style={{ color: 'gray', fontSize: 12 }}>
+            {chatItemData.lastMessage ?? ''}
+          </DefaultText>
         </View>
-        <View style={{ flex: 2 }}>
-          <Text style={{ textAlign: 'center', fontSize: 12 }}>
+        <View
+          style={{
+            flex: 2,
+            alignItems: 'flex-end',
+            justifyContent: 'flex-start',
+            marginRight: 10,
+          }}>
+          <DefaultText
+            style={{ textAlign: 'center', fontSize: 12, marginBottom: 10 }}>
             {dayjs().format('HH:MM')}
-          </Text>
+          </DefaultText>
+          {chatItemData.unReadCount ? (
+            <DefaultText
+              style={{
+                backgroundColor: 'red',
+                borderRadius: 10,
+                width: 20,
+                height: 20,
+                textAlign: 'center',
+                textAlignVertical: 'center',
+                color: 'white',
+              }}>
+              {chatItemData.unReadCount}
+            </DefaultText>
+          ) : null}
         </View>
       </Pressable>
     );
@@ -245,25 +118,25 @@ export default function Chat(props: any) {
             ref={chatListRef}
             contentContainerStyle={{ minHeight: chatListMinHeight }}
             ListEmptyComponent={
-              <Text
+              <DefaultText
                 style={{
                   textAlign: 'center',
                   textAlignVertical: 'center',
                   height: chatListMinHeight,
                 }}>
-                {!isChatListRefreshing ? '暂无数据' : ''}
-              </Text>
+                {!isChatListRefreshing ? '快去聊天吧！' : ''}
+              </DefaultText>
             }
             ListFooterComponent={<></>}
             refreshing={isChatListRefreshing}
             onRefresh={async () => {
-              // await refreshChatList();
+              await refreshChatList();
             }}
             style={{
               height: chatListMinHeight,
             }}
             data={chatList}
-            renderItem={({ item }) => <ChatItem data={item} />}
+            renderItem={({ item }) => <ChatItem chatItemData={item} />}
             keyExtractor={(item: any) => item.chatId}
           />
         </>
