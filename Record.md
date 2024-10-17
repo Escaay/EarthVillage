@@ -42,3 +42,56 @@
 21. 组件更新导致输入法被收起，是因为Input组件被整体更新了，导致失去了焦点，平时输入都是Input的value更新，不会导致Input整体更新，想象成Input里面还有Text，value变化更新Text，不会失去焦点
 
 22. /^[A-Za-z0-9@$!%*?&.]{6,}$/.test(undefined)输入为true，因为undefined会被转换为'undefined'
+
+23. 默认的import { FlatList } from 'react-native-gesture-handler';会报错，记得从react-native引入
+
+24. const navigation = useNavigation<any>(), 记得加any,不然会飘红
+
+25. TabBar底部栏的直接在页面里面判断isLogin，其他栈页面用路由守卫
+
+26. TabBar底部栏的全都是只有切换过去才加载，而不是一进app就加载，所以Chat中监听myInfo不用useUpdateEffect,用useEffect
+
+27. 遇到onPress事件不触发，想想是不是被别的元素盖住了，因为rn的事件冒泡只要捕捉到了就不会往上继续冒泡了
+
+28. 在函数组件中，外面定义fn, 然后useEffect中ws.onmessage = fn，可能会导致后续fn更新了，但是ws.onmessage还是原来的引用，因为useEffect执行有条件，fn每次都会检测更新，想想引用传递，每次setState之后，状态就不是原来的引用了，而函数里面用的还是原来的引用
+
+29. 更新数组或者对象状态时，直接修改原对象就行，然后解构赋值去更新状态，赋值的时候对象已经变了，只是函数组件还没有更新，所以不会展示出最新状态，只要更新的时候引用不一样，组件就会更新
+
+30. 测试聊天场景时，手机和模拟器都连接同一端口，会出现错乱的情况，因为这个端口发过来的数据两个设备都会接到，不要被误导
+
+31. 全局状态设计要考虑是否会牵一发动全身导致不必要的请求，例如改变filterInfo导致myInfo变化，导致chatList和recommandList重新请求，但是其实chatList只有在myInfo.id变化的时候才会变化，全局状态和后端的表考量的东西不一样，所以结构也不一定一样, 如果使用的地方很多，可以考虑把userId单独拿出来做一个全局状态，如果用的地方少，就用useMemo单独去依赖，例如const userId = useMemo(() => myInfo.id, [myInfo.id]) (其实useEffect也能达到一样的效果)
+
+32. 如果客户端重复连接websocket，那么那边会维护一个最新的连接，不会浪费资源
+
+33. 嵌套函数的依赖项，再包一层，例如
+    const closeWebsocket = React.useCallback(() => {
+    console.log('websocket close')
+    websocket?.close();
+    setWebsocket(null);
+    }, [websocket])
+    // 组件销毁关闭连接
+    useEffect(() => {
+    return closeWebsocket
+    }, [])
+
+34. adb调试 (最常用的命令调试RN: adb logcat \*:S ReactNative:V ReactNativeJS:V)
+    //格式1：打印默认日志数据
+    adb logcat
+
+//格式2：需要打印日志详细时间的简单数据
+adb logcat -v time
+
+//格式3：需要打印级别为Error的信息
+adb logcat \*:E
+
+//格式4：需要打印时间和级别是Error的信息
+adb logcat -v time \*:E
+
+//格式5：将日志保存到电脑固定的位置，比如D:\log.txt
+adb logcat -v time >D:\log.txt
+
+console.dir()在生产环境会报错，不要用
+
+35. 打包后的生产环境不让用ws明文传输，需要用wss，但是dev环境可以，这个报错只会在客户端，类似于跨域，服务端不会报错
+
+36. KeyboardAvoidingView不能很好的抬起输入框，因为输入法上面还有一行工具栏，可以获取输入法高度，设置input的position：relative，bottom抬起，但是因为只能DisShow，所以会有延迟闪烁

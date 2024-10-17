@@ -11,6 +11,9 @@ import {
   Pressable,
   Modal,
   Keyboard,
+  NativeModules,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useRoute } from '@react-navigation/native';
@@ -31,16 +34,24 @@ import { queryChatList } from '../../../api/user';
 import DefaultText from '../../../component/DefaultText';
 import { useWebsocket } from '../../../store/websocket';
 import useUpdateEffect from '../../../utils/useUpdateEffect';
+const { StatusBarManager } = NativeModules;
+const STATUS_BAR_HEIGHT =
+  Platform.OS === 'android' ? StatusBar.currentHeight : StatusBarManager.HEIGHT;
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+const flatListMinHeight =
+  screenHeight - basic.headerHeight - basic.tabBarHeight - STATUS_BAR_HEIGHT;
 const isPicture = (value: string) => {
   return value?.startsWith('data:image/png;base64') && value.length > 1000;
 };
 export default function ChatDetail(props: any) {
   const myInfo = useMyInfo();
   const websocket = useWebsocket();
+  const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(true);
   const chatList = useChatList() ?? [];
-  const scrollViewRef = useRef();
+  const flatListRef = useRef();
   const { height: screenHeight } = Dimensions.get('window');
   const route = useRoute<any>();
+  const [keyBoardHeight, setKeyboardHeigt] = useState(0);
   const [isKeyboardShow, setIsKeyboardShow] = useState(false);
   const messagesList = useMessagesList();
   const { chatItemData } = route.params;
@@ -76,11 +87,8 @@ export default function ChatDetail(props: any) {
     console.log('清除');
     try {
       if (chatItemData.unReadCount) {
-        const newChatItemData = {
-          ...chatItemData,
-          unReadCount: 0,
-        };
-        const newChatList = [...chatList.slice(0, -1), newChatItemData];
+        chatItemData.unReadCount = 0;
+        const newChatList = [...chatList];
         await updateChatList({
           userId: myInfo.id,
           chatList: newChatList,
@@ -99,14 +107,17 @@ export default function ChatDetail(props: any) {
     // const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
     //   console.log('keyboardWillShow')
     // });
-    Keyboard.addListener('keyboardDidShow', () => {
+    Keyboard.addListener('keyboardDidShow', e => {
       setIsKeyboardShow(true);
+      // 键盘高度
+      setKeyboardHeigt(e.endCoordinates.height);
     });
     Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardShow(false);
+      setKeyboardHeigt(0);
     });
     // 初次进来不需要动画到底部
-    scrollViewRef.current?.scrollToEnd({ animated: false });
+    flatListRef.current?.scrollToEnd({ animated: false });
     websocket.send(
       JSON.stringify({
         // 进入聊天，告诉websocket正在跟谁聊天，这样websocket能判断是否要更新那个人的unReadCount信息
@@ -129,25 +140,28 @@ export default function ChatDetail(props: any) {
           },
         }),
       );
+      Keyboard.removeAllListeners('keyboardDidShow');
+      Keyboard.removeAllListeners('keyboardDidHide');
     };
   }, []);
 
   useUpdateEffect(() => {
     console.log('后续');
     // 后续发送消息需要动画
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
   const clickSend = async (value: string = contentValue) => {
     if (value === undefined || value === '') return;
     const messageId = uuidV4();
+    const messageCreateTime = new Date();
     const newMessage = {
       messageId,
       chatId,
       content: value,
       senderId: myInfo.id,
       receiverId: partnerId,
-      createTime: new Date(),
+      createTime: messageCreateTime,
     };
     try {
       await createMessage(newMessage);
@@ -171,11 +185,11 @@ export default function ChatDetail(props: any) {
       // 判断是否图片，是图片的话显示文字版图片
       const lastMessage = isPicture(value) ? '【图片】' : value;
       chatItemData.lastMessage = lastMessage;
-      // const newChatItemData = {
-      //   ...chatItemData,
-      //   lastMessage,
-      // };
-      const newChatList = [...chatList];
+      chatItemData.lastMessageTime = messageCreateTime;
+      const newChatList = [
+        chatItemData,
+        ...chatList?.filter(item => item !== chatItemData),
+      ];
       await updateChatList({
         userId: myInfo.id,
         chatList: newChatList,
@@ -207,6 +221,7 @@ export default function ChatDetail(props: any) {
 
   const MessageItem = (props: any) => {
     const { message } = props;
+    console.log(message);
     const isMySend = message.senderId === myInfo.id;
     return (
       <View
@@ -281,48 +296,70 @@ export default function ChatDetail(props: any) {
       </Modal>
       <HeaderBar text={partnerName}></HeaderBar>
       {/* <KeyboardAvoidingView behavior="position" keyboardVerticalOffset={20}> */}
-      <KeyboardAvoidingView behavior="position">
-        <ScrollView
-          removeClippedSubviews={true}
-          ref={scrollViewRef}
-          style={{ height: screenHeight - basic.headerHeight - INPUT_HEIGHT }}>
-          {messages?.map((message: any) => (
-            <MessageItem
-              key={message.messageId}
-              message={message}></MessageItem>
-          ))}
-          <View></View>
-        </ScrollView>
-        <View
-          style={{
-            height: INPUT_HEIGHT,
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 10,
-          }}>
-          <Icon name="picture" size={36} onPress={clickPicture} />
-          <Input
-            value={contentValue}
-            onChange={e => setContentValue(e.target.value)}
+      {/* <KeyboardAvoidingView behavior="position"> */}
+      {/* <View style={{
+        paddingBottom: keyBoardHeight,
+        height: flatListMinHeight + INPUT_HEIGHT
+      }}> */}
+      <FlatList
+        style={{
+          height: flatListMinHeight,
+          flexGrow: 0,
+          position: 'relative',
+          bottom: keyBoardHeight,
+        }}
+        contentContainerStyle={{ minHeight: flatListMinHeight }}
+        removeClippedSubviews={true}
+        data={messages}
+        renderItem={({ item: message }) => (
+          <MessageItem key={message.messageId} message={message}></MessageItem>
+        )}
+        ListEmptyComponent={
+          <DefaultText
             style={{
-              flex: 8,
-              backgroundColor: 'white',
-              borderWidth: 1,
-              borderColor: 'rgba(0,0,0,0.3)',
-              borderRadius: 10,
-              marginHorizontal: 6,
-            }}></Input>
-          <BasicButton
-            style={{ flex: 2 }}
-            fontSize={13}
-            height={INPUT_HEIGHT - 10}
-            onPress={() => clickSend()}>
-            发送
-          </BasicButton>
-        </View>
-        <View style={{ height: isKeyboardShow ? 40 : 0 }} />
-      </KeyboardAvoidingView>
+              textAlign: 'center',
+              textAlignVertical: 'center',
+              height: flatListMinHeight,
+            }}>
+            {!isMessagesRefreshing ? '暂无数据' : ''}
+          </DefaultText>
+        }
+        ref={flatListRef}
+        refreshing={isMessagesRefreshing}
+      />
+      <View
+        style={{
+          position: 'relative',
+          bottom: keyBoardHeight,
+          height: INPUT_HEIGHT,
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 10,
+        }}>
+        <Icon name="picture" size={36} onPress={clickPicture} />
+        <Input
+          value={contentValue}
+          onChange={e => setContentValue(e.target.value)}
+          style={{
+            flex: 8,
+            backgroundColor: 'white',
+            borderWidth: 1,
+            borderColor: 'rgba(0,0,0,0.3)',
+            borderRadius: 10,
+            marginHorizontal: 6,
+          }}></Input>
+        <BasicButton
+          style={{ flex: 2 }}
+          fontSize={13}
+          height={INPUT_HEIGHT - 10}
+          onPress={() => clickSend()}>
+          发送
+        </BasicButton>
+      </View>
+      {/* </View> */}
+      {/* <View style={{ height: isKeyboardShow ? 100 : 0 }} /> */}
+      {/* </KeyboardAvoidingView> */}
     </View>
   );
 }
