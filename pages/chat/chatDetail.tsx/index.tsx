@@ -14,11 +14,12 @@ import {
   NativeModules,
   StatusBar,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useRoute } from '@react-navigation/native';
 import HeaderBar from '../../../component/HeaderBar';
-import { Input } from '@ant-design/react-native';
+import { Input, Toast } from '@ant-design/react-native';
 import { Icon } from '@ant-design/react-native';
 import BasicButton from '../../../component/BasicButton';
 import ImageViewer from 'react-native-image-zoom-viewer';
@@ -28,28 +29,40 @@ import dayjs from 'dayjs';
 import { setMessagesList, useMessagesList } from '../../../store/messagesList';
 import { useMyInfo } from '../../../store/myInfo';
 import { setChatList, useChatList } from '../../../store/chatList';
-import { createMessage, updateChatList } from '../../../api/user';
+import {
+  createMessage,
+  queryMessagesByChatIds,
+  queryUserBasis,
+  updateChatList,
+} from '../../../api/user';
 import { v4 as uuidV4 } from 'uuid';
 import { queryChatList } from '../../../api/user';
 import DefaultText from '../../../component/DefaultText';
 import { useWebsocket } from '../../../store/websocket';
 import useUpdateEffect from '../../../utils/useUpdateEffect';
-const { StatusBarManager } = NativeModules;
-const STATUS_BAR_HEIGHT =
-  Platform.OS === 'android' ? StatusBar.currentHeight : StatusBarManager.HEIGHT;
-const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-const flatListMinHeight =
-  screenHeight - basic.headerHeight - basic.tabBarHeight - STATUS_BAR_HEIGHT;
+import { useNavigation } from '@react-navigation/native';
+
 const isPicture = (value: string) => {
   return value?.startsWith('data:image/png;base64') && value.length > 1000;
 };
 export default function ChatDetail(props: any) {
+  const navigation = useNavigation<any>();
+  const { StatusBarManager } = NativeModules;
+  const INPUT_HEIGHT = 50;
+  const STATUS_BAR_HEIGHT =
+    Platform.OS === 'android'
+      ? StatusBar.currentHeight
+      : StatusBarManager.HEIGHT;
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const flatListMinHeight = screenHeight - basic.headerHeight - INPUT_HEIGHT;
+
   const myInfo = useMyInfo();
   const websocket = useWebsocket();
-  const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(true);
-  const chatList = useChatList() ?? [];
+  // const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(false);
+  const chatList = useChatList();
   const flatListRef = useRef();
-  const { height: screenHeight } = Dimensions.get('window');
+  // 是否全部加载了
+  const isAllHistoryLoad = useRef<boolean>(false);
   const route = useRoute<any>();
   const [keyBoardHeight, setKeyboardHeigt] = useState(0);
   const [isKeyboardShow, setIsKeyboardShow] = useState(false);
@@ -100,13 +113,40 @@ export default function ChatDetail(props: any) {
     }
   };
 
+  const loadHistoryMessages = async () => {
+    if (isAllHistoryLoad.current) return;
+    try {
+      const historyMessageItem = (
+        await queryMessagesByChatIds({
+          queryMessagesParams: [
+            {
+              chatId: chatItemData.chatId,
+              skip: messages.length,
+            },
+          ],
+        })
+      ).data[0];
+      if (!historyMessageItem.messages.length) {
+        isAllHistoryLoad.current = true;
+        return;
+      }
+      const currentMessagesItem = messagesList?.find(
+        item => item.chatId === chatId,
+      );
+      currentMessagesItem.messages = [
+        ...historyMessageItem.messages,
+        ...currentMessagesItem?.messages,
+      ];
+      setMessagesList([...messagesList]);
+      const currentFirstItem = messages[messages.length - 1];
+      console.log('scrollToItem');
+      // flatListRef.current?.scrollToItem({ item: currentFirstItem, animated: true });
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
   useEffect(() => {
-    // const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
-    //   console.log('keyboardWillShow')
-    // });
-    // const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-    //   console.log('keyboardWillShow')
-    // });
     Keyboard.addListener('keyboardDidShow', e => {
       setIsKeyboardShow(true);
       // 键盘高度
@@ -116,8 +156,10 @@ export default function ChatDetail(props: any) {
       setIsKeyboardShow(false);
       setKeyboardHeigt(0);
     });
-    // 初次进来不需要动画到底部
-    flatListRef.current?.scrollToEnd({ animated: false });
+    // 初次进来到底部不需要动画
+    setTimeout(() => {
+      flatListRef?.current?.scrollToEnd({ animated: false });
+    }, 500);
     websocket.send(
       JSON.stringify({
         // 进入聊天，告诉websocket正在跟谁聊天，这样websocket能判断是否要更新那个人的unReadCount信息
@@ -145,14 +187,11 @@ export default function ChatDetail(props: any) {
     };
   }, []);
 
-  useUpdateEffect(() => {
-    console.log('后续');
-    // 后续发送消息需要动画
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+  useUpdateEffect(() => {}, [messages]);
 
   const clickSend = async (value: string = contentValue) => {
     if (value === undefined || value === '') return;
+    const key = Toast.loading('消息发送中');
     const messageId = uuidV4();
     const messageCreateTime = new Date();
     const newMessage = {
@@ -174,14 +213,18 @@ export default function ChatDetail(props: any) {
       );
       const oldMessages = messagesList.find(item => item.chatId === chatId);
       // 多一个判断因为类型问题，其实oldMessages一定有的
-      console.log('oldmessagesList1');
+      // console.log('oldmessagesList1');
       if (oldMessages) {
         oldMessages.messages = oldMessages?.messages.concat(newMessage);
-        console.log('oldmessagesList2');
+        // console.log('oldmessagesList2');
         // console.dir(messagesList, { depth: null });
       }
+      console.log('更新messageList-----=--==-=-');
       setMessagesList([...messagesList]);
       setContentValue('');
+      // 后续发送消息滚到底部需要动画
+      flatListRef.current?.scrollToEnd({ animated: true });
+      Toast.remove(key);
       // 判断是否图片，是图片的话显示文字版图片
       const lastMessage = isPicture(value) ? '【图片】' : value;
       chatItemData.lastMessage = lastMessage;
@@ -219,9 +262,18 @@ export default function ChatDetail(props: any) {
     }
   };
 
+  const clickAvatar = async (isMySend: boolean, senderId: string) => {
+    let userItem: any;
+    if (isMySend) {
+      userItem = myInfo;
+    } else {
+      userItem = (await queryUserBasis({ id: senderId })).data;
+    }
+    navigation.navigate('Others', { userItem });
+  };
+
   const MessageItem = (props: any) => {
     const { message } = props;
-    console.log(message);
     const isMySend = message.senderId === myInfo.id;
     return (
       <View
@@ -229,7 +281,9 @@ export default function ChatDetail(props: any) {
           flexDirection: isMySend ? 'row-reverse' : 'row',
           paddingVertical: 10,
         }}>
-        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <Pressable
+          onPress={() => clickAvatar(isMySend, message.senderId)}
+          style={{ justifyContent: 'center', alignItems: 'center' }}>
           <Image
             style={{
               width: 50,
@@ -244,7 +298,7 @@ export default function ChatDetail(props: any) {
                 : require('../../../assets/img/avatar.png')
             }
           />
-        </View>
+        </Pressable>
         <View style={{ paddingHorizontal: 5, justifyContent: 'center' }}>
           {isPicture(message.content) ? (
             <Pressable
@@ -284,7 +338,6 @@ export default function ChatDetail(props: any) {
     );
   };
 
-  const INPUT_HEIGHT = 50;
   return (
     <View style={{}}>
       <Modal visible={isPreviewImage} transparent={true}>
@@ -308,24 +361,16 @@ export default function ChatDetail(props: any) {
           position: 'relative',
           bottom: keyBoardHeight,
         }}
+        onRefresh={loadHistoryMessages}
         contentContainerStyle={{ minHeight: flatListMinHeight }}
         removeClippedSubviews={true}
         data={messages}
         renderItem={({ item: message }) => (
           <MessageItem key={message.messageId} message={message}></MessageItem>
         )}
-        ListEmptyComponent={
-          <DefaultText
-            style={{
-              textAlign: 'center',
-              textAlignVertical: 'center',
-              height: flatListMinHeight,
-            }}>
-            {!isMessagesRefreshing ? '暂无数据' : ''}
-          </DefaultText>
-        }
         ref={flatListRef}
-        refreshing={isMessagesRefreshing}
+        refreshing={false}
+        // refreshing={isMessagesRefreshing}
       />
       <View
         style={{
