@@ -1,27 +1,70 @@
 import websocketConfig from '../config/websocket';
-console.log(`ws://${websocketConfig.host}/user/wsConnect`);
-const wsConnect = () => {
-  const ws = new WebSocket(`ws://${websocketConfig.host}/user/wsConnect`);
-
+import { updateChatList } from '../api/user';
+const wsConnect = (params: any) => {
+  const { userId } = params;
+  const ws = new WebSocket(`wss://${websocketConfig.host}`);
   ws.onopen = () => {
-    console.log('WebSocket connection opened');
-    ws.send('Hello, server!');
+    console.log('Websocket连接成功');
+    // 统一数据格式
+    // {
+    //   type: string;
+    //   data: JSON
+    // }
+    ws.send(
+      JSON.stringify({
+        type: 'init',
+        data: {
+          userId,
+        },
+      }),
+    );
   };
 
-  ws.onmessage = event => {
-    console.log('Message from server:', event.data);
-  };
+  // ws.onmessage = async (event) => {
+  //   const obj = JSON.parse(event.data);
+  //   console.log('接收服务端消息:');
+  //   console.log(obj);
+  //   const type = obj.type;
+  //   console.log(type)
+  //   switch (type) {
+  //     case 'init':
+  //       break;
+  //     case 'sendMessage':
+  //       try {
+  //       // const isPicture = (value: string) =>
+  //       //   value.startsWith('data:image/png;base64') && value.length > 1000;
+  //       // const { createTime, content: newMessage, partnerId, userId, chatId } = obj.data;
+  //       // const oldMessages = messagesList.find((item: any) => item.chatId === chatId)
+  //       // // 多一个判断因为类型问题，其实oldMessages一定有的
+  //       // if (oldMessages) {
+  //       //   oldMessages.messages = oldMessages?.messages.concat(newMessage)
+  //       // }
+  //       console.log('messagesList---', messagesList)
+  //       // setMessagesList([...messagesList]);
+  //       // 判断是否图片，是图片的话显示文字版图片
+  //       // const lastMessage = isPicture(newMessage) ? '【图片】' : newMessage;
+  //       // const chatItemData = chatList.find((item: any) => item.chatId === chatId)
+  //       // const newChatItemData = {
+  //       //   ...chatItemData,
+  //       //   lastMessage,
+  //       // };
+  //       // const newChatList = [...chatList.slice(0, -1), newChatItemData];
+  //       // console.log('刷新chatList')
+  //       // setChatList(newChatList);
+  //     } catch (e) {
+  //       console.log(e)
+  //     }
+  //       break;
+  //   }
+  // };
 
   ws.onclose = () => {
-    console.log('WebSocket connection closed');
+    console.log('WebSocket连接关闭');
   };
 
   ws.onerror = error => {
-    console.error('WebSocket error:', error);
+    console.log('WebSocket错误', error);
   };
-  return {
-    // 清理函数，在组件卸载时关闭 WebSocket 连接
-    close: () => ws.close(),
-  };
+  return ws;
 };
 export default wsConnect;

@@ -10,6 +10,6 @@ const useUpdateEffect = (
       return;
     }
     return effect();
-  }, [...deps]);
+  }, deps);
 };
 export default useUpdateEffect;
