@@ -1,6 +1,13 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { ScrollView, Text, View, TextInput, Dimensions } from 'react-native';
+import {
+  ScrollView,
+  Text,
+  View,
+  TextInput,
+  Dimensions,
+  useWindowDimensions,
+} from 'react-native';
 import { useMyInfo, setMyInfo } from '../store/myInfo';
 import Tag from './Tag';
 import { Image } from 'react-native';
@@ -175,7 +182,7 @@ export default function InputUserInfo(props: any) {
   //     </>
   //   )
   // }
-  const { height: screenHeight } = Dimensions.get('window');
+  const { height: screenHeight } = useWindowDimensions();
   // 屏幕高度减去头部标题的高度，就是滚动区域的高度（主内容）
   const scrollContainerHeight = screenHeight - basic.headerHeight;
   const ImageUpload = (props: any) => (

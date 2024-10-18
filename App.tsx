@@ -1,9 +1,10 @@
 import * as React from 'react';
+import { PushyProvider, Pushy } from 'react-native-update';
 import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Icon } from '@ant-design/react-native';
+import { Icon, Provider, Toast } from '@ant-design/react-native';
 import Me from './pages/me';
 import Edit from './pages/me/edit';
 import Home from './pages/home';
@@ -15,6 +16,19 @@ import Setting from './pages/me/setting';
 import Chat from './pages/chat';
 import RouterGuard from './component/RouterGuard';
 import ChatDetail from './pages/chat/chatDetail.tsx';
+import { useChatList } from './store/chatList.ts';
+import { setGlobalTip, useGlobalTip } from './store/globalTip.ts';
+import ProgressTips from './component/ProgressTips.tsx';
+import useUpdateEffect from './utils/useUpdateEffect.ts';
+const appKey = '4NARp5NHhOThVMRe4gzZZKFh';
+const pushyClient = new Pushy({
+  appKey,
+  // 注意，默认情况下，在开发环境中不会检查更新
+  // 如需在开发环境中调试更新，请设置debug为true
+  // 但即便打开此选项，也仅能检查、下载热更，并不能实际应用热更。实际应用热更必须在release包中进行。
+  // debug: true
+});
+Toast.config({ duration: 0.6, mask: true });
 const RouterStack = createNativeStackNavigator();
 const RouterGuardWithOthers = () => (
   <RouterGuard>
@@ -32,6 +46,12 @@ const RouterGuardWithChatDetail = () => (
   </RouterGuard>
 );
 function HomeTabsRouter() {
+  const chatList = useChatList();
+  console.log('HomeTabsRouter刷新');
+  const totalUnReadCount = chatList?.reduce(
+    (pre, cur) => pre + cur.unReadCount,
+    0,
+  );
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -65,7 +85,11 @@ function HomeTabsRouter() {
       />
       <Tab.Screen
         name="Chat"
-        options={{ title: '消息', headerShown: false }}
+        options={{
+          title: '消息',
+          headerShown: false,
+          tabBarBadge: totalUnReadCount ? totalUnReadCount : undefined,
+        }}
         component={Chat}
       />
 
@@ -78,44 +102,48 @@ const Tab = createBottomTabNavigator();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <RouterStack.Navigator>
-        <RouterStack.Screen
-          name="HomeTabsRouter"
-          options={{ headerShown: false }}
-          component={HomeTabsRouter}
-        />
-        <RouterStack.Screen
-          name="Edit"
-          options={{ headerShown: false }}
-          component={Edit}
-        />
-        <RouterStack.Screen
-          options={{ headerShown: false }}
-          name="Filter"
-          component={RouterGuardWithFilter}
-        />
-        <RouterStack.Screen
-          name="Others"
-          options={{ headerShown: false }}
-          component={RouterGuardWithOthers}
-        />
-        <RouterStack.Screen
-          options={{ headerShown: false }}
-          name="Login"
-          component={Login}
-        />
-        <RouterStack.Screen
-          options={{ headerShown: false }}
-          name="Setting"
-          component={Setting}
-        />
-        <RouterStack.Screen
-          options={{ headerShown: false }}
-          name="ChatDetail"
-          component={RouterGuardWithChatDetail}
-        />
-      </RouterStack.Navigator>
-    </NavigationContainer>
+    <PushyProvider client={pushyClient}>
+      <Provider>
+        <NavigationContainer>
+          <RouterStack.Navigator>
+            <RouterStack.Screen
+              name="HomeTabsRouter"
+              options={{ headerShown: false }}
+              component={HomeTabsRouter}
+            />
+            <RouterStack.Screen
+              name="Edit"
+              options={{ headerShown: false }}
+              component={Edit}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="Filter"
+              component={RouterGuardWithFilter}
+            />
+            <RouterStack.Screen
+              name="Others"
+              options={{ headerShown: false }}
+              component={RouterGuardWithOthers}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="Login"
+              component={Login}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="Setting"
+              component={Setting}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="ChatDetail"
+              component={RouterGuardWithChatDetail}
+            />
+          </RouterStack.Navigator>
+        </NavigationContainer>
+      </Provider>
+    </PushyProvider>
   );
 }
