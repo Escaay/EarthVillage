@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Text, StyleSheet, Image, ScrollView, View } from 'react-native';
+import { Text, StyleSheet, Image, ScrollView, View, Modal } from 'react-native';
+import ImageViewer from 'react-native-image-zoom-viewer';
 import {
   Button,
   WhiteSpace,
@@ -18,22 +19,25 @@ import { useRoute } from '@react-navigation/native';
 import randomInteger from '../utils/randomInteger';
 import tagRgbaColor from '../config/tagRgbaColor';
 import HeaderBar from '../component/HeaderBar';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Pressable } from 'react-native';
 import { queryUserBasis } from '../api/user';
+import DefaultText from './DefaultText';
 // const randomRgbaColor = () => {
 //   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
 // };
-import { useMyInfo } from '../store/my-info';
+import { useMyInfo } from '../store/myInfo';
 export default function UserDetail({ userItem }: { userItem: any }) {
   // 没传userId就是自己的主页，后端直接通过token里面拿到id返回个人信息
   const myInfo = useMyInfo();
   const isMe = userItem.id === myInfo.id;
+  const [isPreviewAvatar, setIsPreviewAvatar] = useState(false);
   const navigation = useNavigation<any>();
   const clickSetting = () => {
     navigation.navigate('Setting');
   };
-  const clickEdit = () => navigation.navigate('Edit');
-
+  const clickEdit = () => {
+    navigation.navigate('Edit');
+  };
   return (
     <ScrollView contentContainerStyle={{ zIndex: 1 }}>
       {/* HeaderBar放在这里是因为没有在外面的页面就拿到userItem，这里需要name作为HeaderBar标题 */}
@@ -57,21 +61,37 @@ export default function UserDetail({ userItem }: { userItem: any }) {
         // mock
         // {(login.userName) ? (
         <View style={{ marginHorizontal: 20 }}>
-          <Image
-            style={{
-              width: 100,
-              height: 100,
-              margin: 'auto',
-              borderRadius: 50,
-            }}
-            source={
-              userItem?.avatarURL
-                ? {
-                    uri: userItem.avatarURL,
-                  }
-                : require('../assets/img/avatar.png')
-            }
-          />
+          <Modal visible={isPreviewAvatar} transparent={true}>
+            <ImageViewer
+              onClick={() => setIsPreviewAvatar(false)}
+              imageUrls={[
+                {
+                  // url支持base64
+                  url: userItem.avatarURL,
+                  props: {
+                    saveToLocalByLongPress: true,
+                  },
+                },
+              ]}
+            />
+          </Modal>
+          <Pressable onPress={() => setIsPreviewAvatar(true)}>
+            <Image
+              style={{
+                width: 100,
+                height: 100,
+                margin: 'auto',
+                borderRadius: 50,
+              }}
+              source={
+                userItem?.avatarURL
+                  ? {
+                      uri: userItem.avatarURL,
+                    }
+                  : require('../assets/img/avatar.png')
+              }
+            />
+          </Pressable>
           {isMe ? (
             <>
               <WhiteSpace size="md" />
@@ -114,24 +134,24 @@ export default function UserDetail({ userItem }: { userItem: any }) {
           <WhiteSpace size="md" />
           <View
             style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text>姓名：{userItem.name}</Text>
-            <Text>年龄：{userItem.age}</Text>
-            <Text>性别：{userItem.gender}</Text>
+            <DefaultText>姓名：{userItem.name}</DefaultText>
+            <DefaultText>年龄：{userItem.age}</DefaultText>
+            <DefaultText>性别：{userItem.gender}</DefaultText>
           </View>
           <WhiteSpace size="md" />
-          <Text>
+          <DefaultText>
             籍贯：
             {userItem.originalAddress
               ?.filter(item => item !== '全部')
               .join('-')}
-          </Text>
+          </DefaultText>
           <WhiteSpace size="md" />
-          <Text>
+          <DefaultText>
             现居：
             {userItem.currentAddress?.filter(item => item !== '全部').join('-')}
-          </Text>
+          </DefaultText>
           <WhiteSpace size="md" />
-          <Text>目前状态：{userItem.status}</Text>
+          <DefaultText>目前状态：{userItem.status}</DefaultText>
           <WhiteSpace size="md" />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {userItem.customTags?.map((item: string, index: number) => (
