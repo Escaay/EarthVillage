@@ -41,6 +41,8 @@ import DefaultText from '../../../component/DefaultText';
 import { useWebsocket } from '../../../store/websocket';
 import useUpdateEffect from '../../../utils/useUpdateEffect';
 import { useNavigation } from '@react-navigation/native';
+import Animated from 'react-native-reanimated';
+import babelConfig from '../../../babel.config';
 
 const isPicture = (value: string) => {
   return value?.startsWith('data:image/png;base64') && value.length > 1000;
@@ -48,29 +50,44 @@ const isPicture = (value: string) => {
 export default function ChatDetail(props: any) {
   const navigation = useNavigation<any>();
   const { StatusBarManager } = NativeModules;
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const INPUT_HEIGHT = 50;
+  /** andorid全面屏幕中 Dimensions.get('window').height 计算屏幕高度时会自动减少StatusBar 的高度
+  解决办法：
+  根据高宽比w/h 判断是否为全面屏幕 手机，
+  如果是全面屏:
+  实际屏幕高度= Dimensions.get('window').height  + StatusBar 的高度
+  不是全面屏
+  实际屏幕高度= Dimensions.get('window').height  
+  **/
+  const ANDROID_STATUS_BAR_HEIGHT =
+    screenHeight / screenWidth > 1.8 ? 0 : StatusBar.currentHeight;
   const STATUS_BAR_HEIGHT =
     Platform.OS === 'android'
-      ? StatusBar.currentHeight
+      ? ANDROID_STATUS_BAR_HEIGHT
       : StatusBarManager.HEIGHT;
-  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
-  const flatListMinHeight = screenHeight - basic.headerHeight - INPUT_HEIGHT;
 
+  const flatListMinHeight =
+    screenHeight - basic.headerHeight - STATUS_BAR_HEIGHT - INPUT_HEIGHT;
   const myInfo = useMyInfo();
   const websocket = useWebsocket();
   // const [isMessagesRefreshing, setIsMessagesRefreshing] = useState(false);
   const chatList = useChatList();
-  const flatListRef = useRef();
+  const flatListRef = useRef<any>();
   // 是否全部加载了
   const isAllHistoryLoad = useRef<boolean>(false);
   const route = useRoute<any>();
+  const timer = useRef<any>(null);
+  const isFirstRender = useRef(true);
+  const isLoadingHistory = useRef(false);
+  const toastKey = useRef<any>(null);
   const [keyBoardHeight, setKeyboardHeigt] = useState(0);
-  const [isKeyboardShow, setIsKeyboardShow] = useState(false);
   const messagesList = useMessagesList();
   const { chatItemData } = route.params;
   const [isPreviewImage, setIsPreviewImage] = useState(false);
   const { chatId, partnerId, partnerName, partnerAvatarURL } = chatItemData;
   let pictureIndex = 0;
+  const flatListContainerHeight = useRef<number>(0);
   const messages = messagesList
     ?.find(item => item.chatId === chatId)
     ?.messages.map(item => ({
@@ -97,7 +114,6 @@ export default function ChatDetail(props: any) {
   };
 
   const clearUnReadCount = async () => {
-    console.log('清除');
     try {
       if (chatItemData.unReadCount) {
         chatItemData.unReadCount = 0;
@@ -115,6 +131,10 @@ export default function ChatDetail(props: any) {
 
   const loadHistoryMessages = async () => {
     if (isAllHistoryLoad.current) return;
+    isLoadingHistory.current = true;
+    // toastKey.current = Toast.loading({
+    //   content: <></>,
+    // });
     try {
       const historyMessageItem = (
         await queryMessagesByChatIds({
@@ -139,27 +159,37 @@ export default function ChatDetail(props: any) {
       ];
       setMessagesList([...messagesList]);
       const currentFirstItem = messages[messages.length - 1];
-      console.log('scrollToItem');
-      // flatListRef.current?.scrollToItem({ item: currentFirstItem, animated: true });
+
+      // flatListRef.current?.scrollToO ({ item: currentFirstItem, animated: true });
     } catch (e) {
       console.log(e);
     }
   };
 
+  const flatListLiftHeight = () => {
+    // 输入框要抬起，但是聊天内容不一定抬起
+    // 如果剩余高度大于剩余键盘高度，那么不抬起
+    // 如果剩余高度小于剩余键盘高度，那么抬起高度 = 键盘高度 - 剩余高度
+    // 有一个细节，因为聊天内容有很多，如果container高度超过了flatListMinHeight，那么就要按照flatListMinHeight来算
+    const remainHeight =
+      flatListMinHeight -
+      (flatListContainerHeight.current > flatListMinHeight
+        ? flatListMinHeight
+        : flatListContainerHeight.current);
+    if (remainHeight >= keyBoardHeight) {
+      return 0;
+    } else {
+      return keyBoardHeight - remainHeight;
+    }
+  };
+
   useEffect(() => {
     Keyboard.addListener('keyboardDidShow', e => {
-      setIsKeyboardShow(true);
-      // 键盘高度
       setKeyboardHeigt(e.endCoordinates.height);
     });
     Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardShow(false);
       setKeyboardHeigt(0);
     });
-    // 初次进来到底部不需要动画
-    setTimeout(() => {
-      flatListRef?.current?.scrollToEnd({ animated: false });
-    }, 500);
     websocket.send(
       JSON.stringify({
         // 进入聊天，告诉websocket正在跟谁聊天，这样websocket能判断是否要更新那个人的unReadCount信息
@@ -223,7 +253,9 @@ export default function ChatDetail(props: any) {
       setMessagesList([...messagesList]);
       setContentValue('');
       // 后续发送消息滚到底部需要动画
-      flatListRef.current?.scrollToEnd({ animated: true });
+      setTimeout(() => {
+        flatListRef?.current?.scrollToEnd({ animated: true });
+      }, 500);
       Toast.remove(key);
       // 判断是否图片，是图片的话显示文字版图片
       const lastMessage = isPicture(value) ? '【图片】' : value;
@@ -262,6 +294,64 @@ export default function ChatDetail(props: any) {
     }
   };
 
+  // 因为内容变化不会一次完全渲染，所以这个函数会多次触发，使用防抖来检测是否完全渲染完毕
+  // 而且防抖的检测时间需要随着内容长度的增多递增，因为内容越多，这个函数触发的间隔越长
+  // 当这个函数在检测时间内没再触发，那就滚动到对应位置
+  const onFlatListContentSizeChange = (width: number, height: number) => {
+    console.log(height);
+    if (isFirstRender.current) {
+      if (!toastKey.current) {
+        toastKey.current = Toast.loading({
+          content: <></>,
+        });
+      }
+      clearTimeout(timer.current);
+      timer.current = null;
+      timer.current = setTimeout(() => {
+        flatListRef?.current?.scrollToEnd({ animated: true });
+        isFirstRender.current = false;
+        Toast.remove(toastKey.current);
+        toastKey.current = null;
+      }, messages?.length * 20);
+      return;
+    }
+
+    // 加载历史记录的逻辑，暂时先这样吧，第一是loading的话体验不是特别好，第二是拿不到上一次高度的值
+    if (isLoadingHistory.current) {
+      // clearTimeout(timer.current);
+      // timer.current = null;
+      // timer.current = setTimeout(() => {
+      //   console.log('height - flatListContainerHeight.current - 50', height - flatListContainerHeight.current - 50)
+      //   flatListRef.current.scrollToOffset({
+      //     offset: height - flatListContainerHeight.current - 50,
+      //     animated: true,
+      //   });
+      //   isLoadingHistory.current = false;
+      //   Toast.remove(toastKey.current);
+      //   toastKey.current = null
+      // }, 2000);
+      isLoadingHistory.current = false;
+      return;
+    }
+
+    // 普通发消息的逻辑，因为只有一条消息，会马上加载好，可以直接固定检测时间
+    setTimeout(() => {
+      flatListRef?.current?.scrollToEnd({ animated: true });
+    }, 100);
+    flatListContainerHeight.current = height;
+  };
+
+  const avatarSource = (isMySend: boolean) => {
+    const avatarURL = isMySend ? myInfo.avatarURL : partnerAvatarURL;
+    if (avatarURL) {
+      return {
+        uri: avatarURL,
+      };
+    } else {
+      return require('../../../assets/img/avatar.png');
+    }
+  };
+
   const clickAvatar = async (isMySend: boolean, senderId: string) => {
     let userItem: any;
     if (isMySend) {
@@ -283,51 +373,55 @@ export default function ChatDetail(props: any) {
         }}>
         <Pressable
           onPress={() => clickAvatar(isMySend, message.senderId)}
-          style={{ justifyContent: 'center', alignItems: 'center' }}>
+          style={{ justifyContent: 'center', alignItems: 'center', flex: 2 }}>
           <Image
             style={{
               width: 50,
               height: 50,
               borderRadius: 30,
             }}
-            source={
-              partnerAvatarURL
-                ? {
-                    uri: isMySend ? myInfo.avatarURL : partnerAvatarURL,
-                  }
-                : require('../../../assets/img/avatar.png')
-            }
+            source={avatarSource(isMySend)}
           />
         </Pressable>
-        <View style={{ paddingHorizontal: 5, justifyContent: 'center' }}>
-          {isPicture(message.content) ? (
-            <Pressable
-              onPress={() => {
-                setIsPreviewImage(true);
-                setPreviewImageIndex(message.pictureIndex);
-              }}>
-              <Image
+        <View
+          style={{
+            flex: 10,
+            flexDirection: 'row',
+            justifyContent: isMySend ? 'flex-end' : 'flex-start',
+            paddingLeft: isMySend ? 20 : 4,
+            paddingRight: isMySend ? 4 : 20,
+          }}>
+          <View style={{ justifyContent: 'center' }}>
+            {isPicture(message.content) ? (
+              <Pressable
+                onPress={() => {
+                  setIsPreviewImage(true);
+                  setPreviewImageIndex(message.pictureIndex);
+                }}>
+                <Image
+                  style={{
+                    borderWidth: 1,
+                    borderColor: 'rgba(0,0,0,0.1)',
+                    width: 100,
+                    height: 100,
+                    borderRadius: 10,
+                  }}
+                  source={{ uri: message.content }}
+                />
+              </Pressable>
+            ) : (
+              <DefaultText
                 style={{
-                  borderWidth: 1,
-                  borderColor: 'rgba(0,0,0,0.1)',
-                  width: 100,
-                  height: 100,
-                  borderRadius: 10,
-                }}
-                source={{ uri: message.content }}
-              />
-            </Pressable>
-          ) : (
-            <DefaultText
-              style={{
-                color: 'gray',
-                fontSize: 12,
-                padding: 10,
-                backgroundColor: 'pink',
-              }}>
-              {message.content}
-            </DefaultText>
-          )}
+                  fontSize: 12,
+                  padding: 10,
+                  color: 'black',
+                  borderRadius: 8,
+                  backgroundColor: isMySend ? 'rgb(149, 236, 105)' : 'white',
+                }}>
+                {message.content}
+              </DefaultText>
+            )}
+          </View>
         </View>
         {/* <View style={{ flex: 2 }}>
         <DefaultText style={{ textAlign: 'center', fontSize: 12 }}>
@@ -359,10 +453,10 @@ export default function ChatDetail(props: any) {
           height: flatListMinHeight,
           flexGrow: 0,
           position: 'relative',
-          bottom: keyBoardHeight,
+          bottom: flatListLiftHeight(),
         }}
         onRefresh={loadHistoryMessages}
-        contentContainerStyle={{ minHeight: flatListMinHeight }}
+        onContentSizeChange={onFlatListContentSizeChange}
         removeClippedSubviews={true}
         data={messages}
         renderItem={({ item: message }) => (
@@ -376,6 +470,7 @@ export default function ChatDetail(props: any) {
         style={{
           position: 'relative',
           bottom: keyBoardHeight,
+          backgroundColor: 'white',
           height: INPUT_HEIGHT,
           flexDirection: 'row',
           justifyContent: 'center',
