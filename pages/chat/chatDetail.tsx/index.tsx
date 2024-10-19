@@ -16,7 +16,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useRoute } from '@react-navigation/native';
 import HeaderBar from '../../../component/HeaderBar';
 import { Input, Toast } from '@ant-design/react-native';
@@ -81,13 +81,15 @@ export default function ChatDetail(props: any) {
   const isFirstRender = useRef(true);
   const isLoadingHistory = useRef(false);
   const toastKey = useRef<any>(null);
-  const [keyBoardHeight, setKeyboardHeigt] = useState(0);
+  const [keyBoardHeight, setKeyboardHeight] = useState(0);
   const messagesList = useMessagesList();
   const { chatItemData } = route.params;
   const [isPreviewImage, setIsPreviewImage] = useState(false);
-  const { chatId, partnerId, partnerName, partnerAvatarURL } = chatItemData;
+  const { chatId, partnerId, partnerInfo } = chatItemData;
+  const { avatarURL: partnerAvatarURL, name: partnerName } = partnerInfo;
   let pictureIndex = 0;
-  const flatListContainerHeight = useRef<number>(0);
+  const [flatListContainerHeight, setFlatListContainerHeight] =
+    useState<number>(0);
   const messages = messagesList
     ?.find(item => item.chatId === chatId)
     ?.messages.map(item => ({
@@ -166,29 +168,30 @@ export default function ChatDetail(props: any) {
     }
   };
 
-  const flatListLiftHeight = () => {
-    // 输入框要抬起，但是聊天内容不一定抬起
+  const flatListLiftHeight = useMemo(() => {
+    // 列表高度变了，输入框会自动抬升，列表高度不变，需要手动抬升输入框
+    // 剩余高度 = flatListMinHeight - flatListContainerHeight
     // 如果剩余高度大于剩余键盘高度，那么不抬起
-    // 如果剩余高度小于剩余键盘高度，那么抬起高度 = 键盘高度 - 剩余高度
+    // 如果剩余高度小于剩余键盘高度，那么抬起高度 = flatListMinHeight（这里已经减去了输入框的高度） - 键盘高度
     // 有一个细节，因为聊天内容有很多，如果container高度超过了flatListMinHeight，那么就要按照flatListMinHeight来算
-    const remainHeight =
-      flatListMinHeight -
-      (flatListContainerHeight.current > flatListMinHeight
-        ? flatListMinHeight
-        : flatListContainerHeight.current);
+    const remainHeight = flatListMinHeight - flatListContainerHeight;
     if (remainHeight >= keyBoardHeight) {
       return 0;
     } else {
-      return keyBoardHeight - remainHeight;
+      return keyBoardHeight;
     }
-  };
+  }, [keyBoardHeight, flatListContainerHeight]);
 
   useEffect(() => {
     Keyboard.addListener('keyboardDidShow', e => {
-      setKeyboardHeigt(e.endCoordinates.height);
+      console.log(e.endCoordinates.height);
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(() => {
+        flatListRef.current.scrollToEnd();
+      }, 100);
     });
     Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardHeigt(0);
+      setKeyboardHeight(0);
     });
     websocket.send(
       JSON.stringify({
@@ -298,7 +301,8 @@ export default function ChatDetail(props: any) {
   // 而且防抖的检测时间需要随着内容长度的增多递增，因为内容越多，这个函数触发的间隔越长
   // 当这个函数在检测时间内没再触发，那就滚动到对应位置
   const onFlatListContentSizeChange = (width: number, height: number) => {
-    console.log(height);
+    console.log('change');
+    setFlatListContainerHeight(height);
     if (isFirstRender.current) {
       if (!toastKey.current) {
         toastKey.current = Toast.loading({
@@ -338,7 +342,6 @@ export default function ChatDetail(props: any) {
     setTimeout(() => {
       flatListRef?.current?.scrollToEnd({ animated: true });
     }, 100);
-    flatListContainerHeight.current = height;
   };
 
   const avatarSource = (isMySend: boolean) => {
@@ -352,14 +355,10 @@ export default function ChatDetail(props: any) {
     }
   };
 
-  const clickAvatar = async (isMySend: boolean, senderId: string) => {
-    let userItem: any;
-    if (isMySend) {
-      userItem = myInfo;
-    } else {
-      userItem = (await queryUserBasis({ id: senderId })).data;
-    }
-    navigation.navigate('Others', { userItem });
+  const clickAvatar = async (isMySend: boolean) => {
+    navigation.navigate('Others', {
+      userItem: isMySend ? myInfo : partnerInfo,
+    });
   };
 
   const MessageItem = (props: any) => {
@@ -372,7 +371,7 @@ export default function ChatDetail(props: any) {
           paddingVertical: 10,
         }}>
         <Pressable
-          onPress={() => clickAvatar(isMySend, message.senderId)}
+          onPress={() => clickAvatar(isMySend)}
           style={{ justifyContent: 'center', alignItems: 'center', flex: 2 }}>
           <Image
             style={{
@@ -450,10 +449,8 @@ export default function ChatDetail(props: any) {
       }}> */}
       <FlatList
         style={{
-          height: flatListMinHeight,
+          height: flatListMinHeight - flatListLiftHeight,
           flexGrow: 0,
-          position: 'relative',
-          bottom: flatListLiftHeight(),
         }}
         onRefresh={loadHistoryMessages}
         onContentSizeChange={onFlatListContentSizeChange}
@@ -469,7 +466,7 @@ export default function ChatDetail(props: any) {
       <View
         style={{
           position: 'relative',
-          bottom: keyBoardHeight,
+          bottom: flatListLiftHeight === 0 ? keyBoardHeight : 0,
           backgroundColor: 'white',
           height: INPUT_HEIGHT,
           flexDirection: 'row',
