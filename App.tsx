@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { PushyProvider, Pushy } from 'react-native-update';
-import { View, Text } from 'react-native';
+import { View, Text, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -28,7 +28,7 @@ const pushyClient = new Pushy({
   // 但即便打开此选项，也仅能检查、下载热更，并不能实际应用热更。实际应用热更必须在release包中进行。
   // debug: true
 });
-Toast.config({ duration: 0.6, mask: true });
+Toast.config({ duration: 0.5, mask: true });
 const RouterStack = createNativeStackNavigator();
 const RouterGuardWithOthers = () => (
   <RouterGuard>
@@ -48,10 +48,13 @@ const RouterGuardWithChatDetail = () => (
 function HomeTabsRouter() {
   const chatList = useChatList();
   console.log('HomeTabsRouter刷新');
-  const totalUnReadCount = chatList?.reduce(
-    (pre, cur) => pre + cur.unReadCount,
-    0,
-  );
+  const totalUnReadCount = chatList?.reduce((pre, cur) => {
+    if (cur.unReadCount) {
+      return pre + cur.unReadCount;
+    } else {
+      return pre;
+    }
+  }, 0);
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -104,6 +107,7 @@ export default function App() {
   return (
     <PushyProvider client={pushyClient}>
       <Provider>
+        <StatusBar backgroundColor="white" barStyle="dark-content" />
         <NavigationContainer>
           <RouterStack.Navigator>
             <RouterStack.Screen

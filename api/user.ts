@@ -36,7 +36,17 @@ export const updateChatList = async (payload: any) => {
 
 export const queryMessages = async (payload: any) => {
   try {
-    const res = await axios.post('/user/queryMessages', payload);
+    const res = await axios.post('/user/queryMessagesList', payload);
+    return res;
+  } catch (e) {
+    console.log(e);
+    return Promise.reject(e);
+  }
+};
+
+export const queryMessagesByChatIds = async (payload: any) => {
+  try {
+    const res = await axios.post('/user/queryMessagesByChatIds', payload);
     return res;
   } catch (e) {
     console.log(e);
