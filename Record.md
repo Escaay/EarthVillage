@@ -61,7 +61,7 @@
 
 31. 全局状态设计要考虑是否会牵一发动全身导致不必要的请求，例如改变filterInfo导致myInfo变化，导致chatList和recommandList重新请求，但是其实chatList只有在myInfo.id变化的时候才会变化，全局状态和后端的表考量的东西不一样，所以结构也不一定一样, 如果使用的地方很多，可以考虑把userId单独拿出来做一个全局状态，如果用的地方少，就用useMemo单独去依赖，例如const userId = useMemo(() => myInfo.id, [myInfo.id]) (其实useEffect也能达到一样的效果)
 
-32. 如果客户端重复连接websocket，那么那边会维护一个最新的连接，不会浪费资源
+32. websocket断线重连会导致重复连接，需要在注册的时候去重，连接是连接，注册是sendMessage才注册，别混乱了
 
 33. 嵌套函数的依赖项，再包一层，例如
     const closeWebsocket = React.useCallback(() => {
@@ -95,3 +95,24 @@ console.dir()在生产环境会报错，不要用
 35. 打包后的生产环境不让用ws明文传输，需要用wss，但是dev环境可以，这个报错只会在客户端，类似于跨域，服务端不会报错
 
 36. KeyboardAvoidingView不能很好的抬起输入框，因为输入法上面还有一行工具栏，可以获取输入法高度，设置input的position：relative，bottom抬起，但是因为只能DisShow，所以会有延迟闪烁
+
+37. 貌似旧版本的android api的Dimensions会把statusBar也算进应用占据屏幕的高度里面，需要分别判断
+
+38. 热更新pushy
+    npx pushy login 登录
+    npx pushy selectApp --platform android 选择应用
+    npx pushy uploadApk android/app/build/outputs/apk/release/app-release.apk 发布原生基准版本
+    ( 此apk供后续版本比对之用。此 apk 的versionName字段(位于android/app/build.gralde中)会被记录为原生版本号packageVersion。)(每次发布基准版本都需要修改版本号后打包，然后再用发布命令，不然发布的时候会报错时间戳不对，版本号是android/app/build.gralde里面的versionName字段)
+    npx pushy bundle --platform android 发布热更新
+
+39. 客户端心跳检测是为了重连
+    服务端心跳检测是为了及时清除断开连接的用户，节约资源
+
+40. 云函数websocket超时时间要设置长一些，不然到了时间会自动断开
+    用户切后台太久会导致实际已经断开连接，此时服务端不一定会执行onclose，但是客户端一定不会执行，当用户切换回来，会触发客户端的onerror和onclose,如果之前服务端没有触发onclose，此时也会触发，一般在客户端的onclose执行自动重连，自动重连之后需要重新拉取chatList和messgaesList
+
+41. 客户端的心跳检测需要在后台任务（Headless JS）中执行，因为类似于定时器的代码，只有应用在前台的时候才会执行，但是例如websocket发消息让客户端更新，这种代码是可以在后台执行完毕的，所以可以通过websocket重连的时候拉取最新chatList，然后根据未读数量去请求对应数量的最新消息，可以做到服务器资源消耗最小化，替代客户端的心跳检测，因为客户端的心跳检测是为了不错过消息
+
+42. flatList自带的refresh在手动设置的时候非常卡顿，在onRefresh自动触发的时候很流畅，所以不要手动设置他，用Toast.loading代替他的功能,其他大部分场景都不需要loading提升的，loading有时候会拖慢速度，更卡
+
+43. 对于主页的userItem,进入他的主页直接把详情传进去，因为列表有，对于聊天的详情的头像点击，先把头像和姓名这些已有的信息传进去，然后在里面再请求个人信息，覆盖，做到能快的尽量快，不要让用户点击了还要等一会，要立刻跳转,然后用户第一次点击某人头像之后可以把请求下来的个人信息做临时的全局存储，让用户在一次app内，对同一个人只请求一次，优化

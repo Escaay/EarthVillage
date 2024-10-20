@@ -1,8 +1,9 @@
 import websocketConfig from '../config/websocket';
 import { updateChatList } from '../api/user';
+import { AppRegistry } from 'react-native';
 const wsConnect = (params: any) => {
   const { userId } = params;
-  const ws = new WebSocket(`wss://${websocketConfig.host}`);
+  const ws = new WebSocket(websocketConfig.host);
   ws.onopen = () => {
     console.log('Websocket连接成功');
     // 统一数据格式
@@ -10,6 +11,21 @@ const wsConnect = (params: any) => {
     //   type: string;
     //   data: JSON
     // }
+    // AppRegistry.registerHeadlessTask('SomeTaskName', () => {
+    //   return async () => {
+    //     setInterval(() => {
+    //       ws.send(
+    //         JSON.stringify({
+    //           type: 'check',
+    //           data: {
+    //             userId,
+    //           },
+    //         }),
+    //       );
+    //     }, 3000);
+    //   };
+    // });
+
     ws.send(
       JSON.stringify({
         type: 'init',

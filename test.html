@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+      .a {
+        background-color: red;
+        width: 200px;
+        height: 200px;
+      }
+      .b {
+        background-color: blue;
+        width: 100px;
+        height: 100px;
+      }
+    </style>
+</head>
+<body>
+  <script>
+    function a () {
+      console.log('a')
+    }
+  </script>
+   <div class="a" onclick="a()">
+    <div class="b" onclick="(() => console.log('b'))()"></div>
+   </div>
+</body>
+</html>
