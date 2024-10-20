@@ -65,7 +65,7 @@ axiosInstance.interceptors.response.use(
   async function (err) {
     if (!key) {
       key = Toast.show({
-        content: '云函数冷启动中，请耐心等待...',
+        content: '网络好像开小差了...',
         icon: 'loading',
         mask: true,
         duration: 0,
