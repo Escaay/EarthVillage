@@ -78,8 +78,9 @@ export default function ChatDetail(props: any) {
   const isAllHistoryLoad = useRef<boolean>(false);
   const route = useRoute<any>();
   const timer = useRef<any>(null);
-  const isFirstRender = useRef(true);
   const isLoadingHistory = useRef(false);
+  // 用来区分让内容高度变化的是哪一个事件，然后在高度变化的回调做出对应的操作
+  const currentState = useRef('firstRender');
   const toastKey = useRef<any>(null);
   const [keyBoardHeight, setKeyboardHeight] = useState(0);
   const messagesList = useMessagesList();
@@ -88,8 +89,8 @@ export default function ChatDetail(props: any) {
   const { chatId, partnerId, partnerInfo } = chatItemData;
   const { avatarURL: partnerAvatarURL, name: partnerName } = partnerInfo;
   let pictureIndex = 0;
-  const [flatListContainerHeight, setFlatListContainerHeight] =
-    useState<number>(0);
+  const flatListContainerHeight =
+    useRef<number>(0);
   const messages = messagesList
     ?.find(item => item.chatId === chatId)
     ?.messages.map(item => ({
@@ -133,6 +134,7 @@ export default function ChatDetail(props: any) {
 
   const loadHistoryMessages = async () => {
     if (isAllHistoryLoad.current) return;
+    currentState.current = 'loadHistoryMessages';
     isLoadingHistory.current = true;
     // toastKey.current = Toast.loading({
     //   content: <></>,
@@ -174,21 +176,21 @@ export default function ChatDetail(props: any) {
     // 如果剩余高度大于剩余键盘高度，那么不抬起
     // 如果剩余高度小于剩余键盘高度，那么抬起高度 = flatListMinHeight（这里已经减去了输入框的高度） - 键盘高度
     // 有一个细节，因为聊天内容有很多，如果container高度超过了flatListMinHeight，那么就要按照flatListMinHeight来算
-    const remainHeight = flatListMinHeight - flatListContainerHeight;
+    const remainHeight = flatListMinHeight - flatListContainerHeight.current;
     if (remainHeight >= keyBoardHeight) {
       return 0;
     } else {
       return keyBoardHeight;
     }
-  }, [keyBoardHeight, flatListContainerHeight]);
+  }, [keyBoardHeight]);
+
+  useUpdateEffect(() => {
+    flatListRef?.current?.scrollToEnd({ animated: false });
+  }, [flatListLiftHeight])
 
   useEffect(() => {
     Keyboard.addListener('keyboardDidShow', e => {
-      console.log(e.endCoordinates.height);
       setKeyboardHeight(e.endCoordinates.height);
-      setTimeout(() => {
-        flatListRef.current.scrollToEnd();
-      }, 100);
     });
     Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);
@@ -224,6 +226,7 @@ export default function ChatDetail(props: any) {
 
   const clickSend = async (value: string = contentValue) => {
     if (value === undefined || value === '') return;
+    currentState.current = 'sendMessage';
     const key = Toast.loading('消息发送中');
     const messageId = uuidV4();
     const messageCreateTime = new Date();
@@ -252,7 +255,6 @@ export default function ChatDetail(props: any) {
         // console.log('oldmessagesList2');
         // console.dir(messagesList, { depth: null });
       }
-      console.log('更新messageList-----=--==-=-');
       setMessagesList([...messagesList]);
       setContentValue('');
       // 后续发送消息滚到底部需要动画
@@ -266,7 +268,7 @@ export default function ChatDetail(props: any) {
       chatItemData.lastMessageTime = messageCreateTime;
       const newChatList = [
         chatItemData,
-        ...chatList?.filter(item => item !== chatItemData),
+        ...chatList?.filter(item => item.chatId !== chatItemData.chatId),
       ];
       await updateChatList({
         userId: myInfo.id,
@@ -301,47 +303,51 @@ export default function ChatDetail(props: any) {
   // 而且防抖的检测时间需要随着内容长度的增多递增，因为内容越多，这个函数触发的间隔越长
   // 当这个函数在检测时间内没再触发，那就滚动到对应位置
   const onFlatListContentSizeChange = (width: number, height: number) => {
-    console.log('change');
-    setFlatListContainerHeight(height);
-    if (isFirstRender.current) {
-      if (!toastKey.current) {
-        toastKey.current = Toast.loading({
-          content: <></>,
-        });
-      }
-      clearTimeout(timer.current);
-      timer.current = null;
-      timer.current = setTimeout(() => {
-        flatListRef?.current?.scrollToEnd({ animated: true });
-        isFirstRender.current = false;
-        Toast.remove(toastKey.current);
-        toastKey.current = null;
-      }, messages?.length * 20);
-      return;
+    flatListContainerHeight.current = height
+    console.log(height)
+    switch (currentState.current) {
+      case 'sendMessage':
+        // 普通发消息的逻辑，因为只有一条消息，会马上加载好，可以直接固定检测时间
+        setTimeout(() => {
+          flatListRef?.current?.scrollToEnd({ animated: true });
+        }, 200);
+        break;
+      case 'firstRender':
+        if (!toastKey.current) {
+          toastKey.current = Toast.loading({
+            content: <></>,
+          });
+        }
+        clearTimeout(timer.current);
+        timer.current = null;
+        timer.current = setTimeout(() => {
+          flatListRef?.current?.scrollToEnd({ animated: false });
+          Toast.remove(toastKey.current);
+          toastKey.current = null;
+        }, messages?.length * 20);
+        break;
+      case 'loadHistoryMessages':
+        // 加载历史记录的逻辑，暂时先这样吧，loading的再滚回去感觉体验一般
+          // clearTimeout(timer.current);
+          // timer.current = null;
+          // timer.current = setTimeout(() => {
+          //   console.log('height - flatListContainerHeight.current - 50', height - flatListContainerHeight.current - 50)
+          //   // flatListRef.current.scrollToOffset({
+          //   //   offset: height - flatListContainerHeight.current - 50,
+          //   //   animated: true,
+          //   // });
+            
+          //   //用这个也可以，但是要知道加载出来的消息数量
+          //   flatListRef.current.scrollToIndex({
+          //     index: 1,
+          //     animated: true,
+          //   });
+          //   Toast.remove(toastKey.current);
+          //   toastKey.current = null
+          // }, 2000);
+          break;
     }
-
-    // 加载历史记录的逻辑，暂时先这样吧，第一是loading的话体验不是特别好，第二是拿不到上一次高度的值
-    if (isLoadingHistory.current) {
-      // clearTimeout(timer.current);
-      // timer.current = null;
-      // timer.current = setTimeout(() => {
-      //   console.log('height - flatListContainerHeight.current - 50', height - flatListContainerHeight.current - 50)
-      //   flatListRef.current.scrollToOffset({
-      //     offset: height - flatListContainerHeight.current - 50,
-      //     animated: true,
-      //   });
-      //   isLoadingHistory.current = false;
-      //   Toast.remove(toastKey.current);
-      //   toastKey.current = null
-      // }, 2000);
-      isLoadingHistory.current = false;
-      return;
-    }
-
-    // 普通发消息的逻辑，因为只有一条消息，会马上加载好，可以直接固定检测时间
-    setTimeout(() => {
-      flatListRef?.current?.scrollToEnd({ animated: true });
-    }, 100);
+    currentState.current = ''
   };
 
   const avatarSource = (isMySend: boolean) => {
@@ -358,6 +364,7 @@ export default function ChatDetail(props: any) {
   const clickAvatar = async (isMySend: boolean) => {
     navigation.navigate('Others', {
       userItem: isMySend ? myInfo : partnerInfo,
+      originPage: route.name
     });
   };
 
