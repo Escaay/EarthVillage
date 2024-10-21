@@ -2,7 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { useRoute } from '@react-navigation/native';
 import { useMyInfo } from '../../store/myInfo';
 import { queryChatList } from '../../api/user';
-import { Dimensions, Text, View, Image, Pressable } from 'react-native';
+import {
+  Dimensions,
+  Text,
+  View,
+  Image,
+  Pressable,
+  NativeModules,
+  Platform,
+  StatusBar,
+  useWindowDimensions,
+} from 'react-native';
 import { FlatList } from 'react-native';
 import dayjs from 'dayjs';
 import basic from '../../config/basic';
@@ -17,29 +27,87 @@ import DefaultText from '../../component/DefaultText';
 import { useUserId } from '../../store/userId';
 export default function Chat(props: any) {
   const navigation = useNavigation<any>();
-  const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
   const myInfo = useMyInfo();
   const isLogin = !!useUserId();
-  const [isChatListRefreshing, setIsChatListRefreshing] = useState(false);
-  const chatListMinHeight = screenHeight - basic.headerHeight;
-  const chatList = useChatList();
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const { StatusBarManager } = NativeModules;
+  const STATUS_BAR_HEIGHT =
+    Platform.OS === 'android'
+      ? StatusBar.currentHeight
+      : StatusBarManager.HEIGHT;
+  const flatListMinHeight =
+    screenHeight - basic.headerHeight - basic.tabBarHeight;
+  const chatList = useChatList()?.sort(item => item.lastMessageTime);
   const chatListRef = useRef<any>();
   const refreshChatList = async () => {
-    setIsChatListRefreshing(true);
-    const chatListRes = await queryChatList({ userId: myInfo.id });
-    setChatList(chatListRes.data);
-    setIsChatListRefreshing(false);
+    const newChatList = (await queryChatList({ userId: myInfo.id })).data;
+    // 按照时间从大到小排序
+    setChatList(
+      newChatList.sort(
+        (a, b) =>
+          new Date(b.lastMessageTime).getTime() -
+          new Date(a.lastMessageTime).getTime(),
+      ),
+    );
   };
-  const messagesList = useMessagesList();
+
+  const displayTime = lastMessageTime => {
+    const dwy = (dayjsTime: any): any => {
+      const day = dayjsTime.format('D');
+      const week = dayjsTime.format('d');
+      const year = dayjsTime.format('YYYY');
+      const hour = dayjsTime.format('H');
+      const month = dayjsTime.format('M');
+      const minute = dayjsTime.format('mm');
+      return {
+        day,
+        week,
+        year,
+        hour,
+        minute,
+        month,
+      };
+    };
+    const formatTime = (now, messageTime) => {
+      // 同一天
+      if (
+        now.year === messageTime.year &&
+        now.month === messageTime.month &&
+        now.day === messageTime.day
+      )
+        return `${messageTime.hour}:${messageTime.minute}`;
+      // 同一周
+      const week = ['日', '一', '二', '三', '四', '五', '六'];
+      if (
+        messageTime.week !== '0' &&
+        Number(now.week) > Number(messageTime.week) &&
+        new Date().getTime() - new Date(lastMessageTime).getTime() <
+          1000 * 3600 * 24 * 7
+      )
+        return `星期${week[messageTime.week]}`;
+      // 同一年
+      if (now.year === messageTime.year)
+        return `${messageTime.month}/${messageTime.day}`;
+      // 不同年份
+      if (now.year === messageTime.year)
+        return `${messageTime.year}/${messageTime.month}`;
+    };
+    const messageTime = dwy(dayjs(lastMessageTime));
+    // console.log(messageTime)
+    const now = dwy(dayjs());
+    return formatTime(now, messageTime);
+  };
 
   const CHAR_ITEM_HEIGTH = 80;
-
   const ChatItem = ({ chatItemData }: { chatItemData: any }) => {
+    const { avatarURL: partnerAvatarURL, name: partnerName } =
+      chatItemData.partnerInfo;
     const clickChatItem = async () => {
       try {
         navigation.navigate('ChatDetail', { chatItemData });
       } catch (e) {}
     };
+    const { lastMessage } = chatItemData;
     return (
       <Pressable
         style={{
@@ -57,9 +125,9 @@ export default function Chat(props: any) {
               borderRadius: 30,
             }}
             source={
-              chatItemData?.partnerAvatarURL
+              partnerAvatarURL
                 ? {
-                    uri: chatItemData.partnerAvatarURL,
+                    uri: partnerAvatarURL,
                   }
                 : require('../../assets/img/avatar.png')
             }
@@ -73,10 +141,14 @@ export default function Chat(props: any) {
               marginBottom: 10,
               fontSize: 14,
             }}>
-            {chatItemData.partnerName}
+            {partnerName}
           </DefaultText>
           <DefaultText style={{ color: 'gray', fontSize: 12 }}>
-            {chatItemData.lastMessage ?? ''}
+            {lastMessage
+              ? lastMessage.length > 10
+                ? lastMessage.slice(0, 10) + '...'
+                : lastMessage
+              : '【新聊天】'}
           </DefaultText>
         </View>
         <View
@@ -88,7 +160,10 @@ export default function Chat(props: any) {
           }}>
           <DefaultText
             style={{ textAlign: 'center', fontSize: 12, marginBottom: 10 }}>
-            {dayjs().format('HH:MM')}
+            {/* YYYY-MM-DD HH:mm:ss */}
+            {chatItemData.lastMessageTime
+              ? displayTime(chatItemData.lastMessageTime)
+              : '新聊天'}
           </DefaultText>
           {chatItemData.unReadCount ? (
             <DefaultText
@@ -116,24 +191,23 @@ export default function Chat(props: any) {
           <HeaderBar text="消息" showBack={false}></HeaderBar>
           <FlatList
             ref={chatListRef}
-            contentContainerStyle={{ minHeight: chatListMinHeight }}
+            contentContainerStyle={{ minHeight: flatListMinHeight }}
             ListEmptyComponent={
               <DefaultText
                 style={{
                   textAlign: 'center',
                   textAlignVertical: 'center',
-                  height: chatListMinHeight,
+                  height: flatListMinHeight,
                 }}>
-                {!isChatListRefreshing ? '快去聊天吧！' : ''}
+                快去聊天吧！
               </DefaultText>
             }
-            ListFooterComponent={<></>}
-            refreshing={isChatListRefreshing}
+            refreshing={false}
             onRefresh={async () => {
               await refreshChatList();
             }}
             style={{
-              height: chatListMinHeight,
+              height: flatListMinHeight,
             }}
             data={chatList}
             renderItem={({ item }) => <ChatItem chatItemData={item} />}

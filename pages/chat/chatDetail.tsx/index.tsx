@@ -89,8 +89,7 @@ export default function ChatDetail(props: any) {
   const { chatId, partnerId, partnerInfo } = chatItemData;
   const { avatarURL: partnerAvatarURL, name: partnerName } = partnerInfo;
   let pictureIndex = 0;
-  const flatListContainerHeight =
-    useRef<number>(0);
+  const flatListContainerHeight = useRef<number>(0);
   const messages = messagesList
     ?.find(item => item.chatId === chatId)
     ?.messages.map(item => ({
@@ -186,7 +185,7 @@ export default function ChatDetail(props: any) {
 
   useUpdateEffect(() => {
     flatListRef?.current?.scrollToEnd({ animated: false });
-  }, [flatListLiftHeight])
+  }, [flatListLiftHeight]);
 
   useEffect(() => {
     Keyboard.addListener('keyboardDidShow', e => {
@@ -303,8 +302,8 @@ export default function ChatDetail(props: any) {
   // 而且防抖的检测时间需要随着内容长度的增多递增，因为内容越多，这个函数触发的间隔越长
   // 当这个函数在检测时间内没再触发，那就滚动到对应位置
   const onFlatListContentSizeChange = (width: number, height: number) => {
-    flatListContainerHeight.current = height
-    console.log(height)
+    flatListContainerHeight.current = height;
+    console.log(height);
     switch (currentState.current) {
       case 'sendMessage':
         // 普通发消息的逻辑，因为只有一条消息，会马上加载好，可以直接固定检测时间
@@ -328,26 +327,26 @@ export default function ChatDetail(props: any) {
         break;
       case 'loadHistoryMessages':
         // 加载历史记录的逻辑，暂时先这样吧，loading的再滚回去感觉体验一般
-          // clearTimeout(timer.current);
-          // timer.current = null;
-          // timer.current = setTimeout(() => {
-          //   console.log('height - flatListContainerHeight.current - 50', height - flatListContainerHeight.current - 50)
-          //   // flatListRef.current.scrollToOffset({
-          //   //   offset: height - flatListContainerHeight.current - 50,
-          //   //   animated: true,
-          //   // });
-            
-          //   //用这个也可以，但是要知道加载出来的消息数量
-          //   flatListRef.current.scrollToIndex({
-          //     index: 1,
-          //     animated: true,
-          //   });
-          //   Toast.remove(toastKey.current);
-          //   toastKey.current = null
-          // }, 2000);
-          break;
+        // clearTimeout(timer.current);
+        // timer.current = null;
+        // timer.current = setTimeout(() => {
+        //   console.log('height - flatListContainerHeight.current - 50', height - flatListContainerHeight.current - 50)
+        //   // flatListRef.current.scrollToOffset({
+        //   //   offset: height - flatListContainerHeight.current - 50,
+        //   //   animated: true,
+        //   // });
+
+        //   //用这个也可以，但是要知道加载出来的消息数量
+        //   flatListRef.current.scrollToIndex({
+        //     index: 1,
+        //     animated: true,
+        //   });
+        //   Toast.remove(toastKey.current);
+        //   toastKey.current = null
+        // }, 2000);
+        break;
     }
-    currentState.current = ''
+    currentState.current = '';
   };
 
   const avatarSource = (isMySend: boolean) => {
@@ -364,77 +363,136 @@ export default function ChatDetail(props: any) {
   const clickAvatar = async (isMySend: boolean) => {
     navigation.navigate('Others', {
       userItem: isMySend ? myInfo : partnerInfo,
-      originPage: route.name
+      originPage: route.name,
     });
   };
 
   const MessageItem = (props: any) => {
-    const { message } = props;
+    const { message, index } = props;
     const isMySend = message.senderId === myInfo.id;
+    const displayTime = () => {
+      const dwy = (dayjsTime: any): any => {
+        const day = dayjsTime.format('D');
+        const week = dayjsTime.format('d');
+        const year = dayjsTime.format('YYYY');
+        const hour = dayjsTime.format('H');
+        const month = dayjsTime.format('M');
+        const minute = dayjsTime.format('mm');
+        return {
+          day,
+          week,
+          year,
+          hour,
+          minute,
+          month,
+        };
+      };
+      const formatTime = (now, messageTime) => {
+        // 同一天
+        if (
+          now.year === messageTime.year &&
+          now.month === messageTime.month &&
+          now.day === messageTime.day
+        )
+          return `${messageTime.hour}:${messageTime.minute}`;
+        // 同一周
+        const week = ['日', '一', '二', '三', '四', '五', '六'];
+        if (
+          messageTime.week !== '0' &&
+          Number(now.week) > Number(messageTime.week) &&
+          new Date().getTime() - new Date(message.createTime).getTime() <
+            1000 * 3600 * 24 * 7
+        )
+          return `星期${week[messageTime.week]}`;
+        // 同一年
+        if (now.year === messageTime.year)
+          return `${messageTime.month}/${messageTime.day} ${messageTime.hour}:${messageTime.minute}`;
+        // 不同年份
+        if (now.year === messageTime.year)
+          return `${messageTime.year}/${messageTime.month}/${messageTime.day} ${messageTime.hour}:${messageTime.minute}`;
+      };
+      const messageTime = dwy(dayjs(message.createTime));
+      const now = dwy(dayjs());
+      if (index === 0) return formatTime(now, messageTime);
+      // const lastMessageTime = dwy(dayjs(messages[index - 1].createTime))
+      // 三分钟内显示一次时间
+      if (
+        new Date(message.createTime).getTime() -
+          new Date(messages[index - 1].createTime).getTime() <
+        1000 * 60 * 3
+      )
+        return false;
+      return formatTime(now, messageTime);
+    };
     return (
-      <View
-        style={{
-          flexDirection: isMySend ? 'row-reverse' : 'row',
-          paddingVertical: 10,
-        }}>
-        <Pressable
-          onPress={() => clickAvatar(isMySend)}
-          style={{ justifyContent: 'center', alignItems: 'center', flex: 2 }}>
-          <Image
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 30,
-            }}
-            source={avatarSource(isMySend)}
-          />
-        </Pressable>
+      <>
+        {displayTime() ? (
+          <Text style={{ margin: 'auto' }}>{displayTime()}</Text>
+        ) : null}
         <View
           style={{
-            flex: 10,
-            flexDirection: 'row',
-            justifyContent: isMySend ? 'flex-end' : 'flex-start',
-            paddingLeft: isMySend ? 20 : 4,
-            paddingRight: isMySend ? 4 : 20,
+            flexDirection: isMySend ? 'row-reverse' : 'row',
+            paddingVertical: 10,
           }}>
-          <View style={{ justifyContent: 'center' }}>
-            {isPicture(message.content) ? (
-              <Pressable
-                onPress={() => {
-                  setIsPreviewImage(true);
-                  setPreviewImageIndex(message.pictureIndex);
-                }}>
-                <Image
+          <Pressable
+            onPress={() => clickAvatar(isMySend)}
+            style={{ justifyContent: 'center', alignItems: 'center', flex: 2 }}>
+            <Image
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 30,
+              }}
+              source={avatarSource(isMySend)}
+            />
+          </Pressable>
+          <View
+            style={{
+              flex: 10,
+              flexDirection: 'row',
+              justifyContent: isMySend ? 'flex-end' : 'flex-start',
+              paddingLeft: isMySend ? 20 : 4,
+              paddingRight: isMySend ? 4 : 20,
+            }}>
+            <View style={{ justifyContent: 'center' }}>
+              {isPicture(message.content) ? (
+                <Pressable
+                  onPress={() => {
+                    setIsPreviewImage(true);
+                    setPreviewImageIndex(message.pictureIndex);
+                  }}>
+                  <Image
+                    style={{
+                      borderWidth: 1,
+                      borderColor: 'rgba(0,0,0,0.1)',
+                      width: 100,
+                      height: 100,
+                      borderRadius: 10,
+                    }}
+                    source={{ uri: message.content }}
+                  />
+                </Pressable>
+              ) : (
+                <DefaultText
                   style={{
-                    borderWidth: 1,
-                    borderColor: 'rgba(0,0,0,0.1)',
-                    width: 100,
-                    height: 100,
-                    borderRadius: 10,
-                  }}
-                  source={{ uri: message.content }}
-                />
-              </Pressable>
-            ) : (
-              <DefaultText
-                style={{
-                  fontSize: 12,
-                  padding: 10,
-                  color: 'black',
-                  borderRadius: 8,
-                  backgroundColor: isMySend ? 'rgb(149, 236, 105)' : 'white',
-                }}>
-                {message.content}
-              </DefaultText>
-            )}
+                    fontSize: 12,
+                    padding: 10,
+                    color: 'black',
+                    borderRadius: 8,
+                    backgroundColor: isMySend ? 'rgb(149, 236, 105)' : 'white',
+                  }}>
+                  {message.content}
+                </DefaultText>
+              )}
+            </View>
           </View>
-        </View>
-        {/* <View style={{ flex: 2 }}>
+          {/* <View style={{ flex: 2 }}>
         <DefaultText style={{ textAlign: 'center', fontSize: 12 }}>
           {dayjs().format('HH:MM')}
         </DefaultText>
       </View> */}
-      </View>
+        </View>
+      </>
     );
   };
 
@@ -463,8 +521,11 @@ export default function ChatDetail(props: any) {
         onContentSizeChange={onFlatListContentSizeChange}
         removeClippedSubviews={true}
         data={messages}
-        renderItem={({ item: message }) => (
-          <MessageItem key={message.messageId} message={message}></MessageItem>
+        renderItem={({ item: message, index }) => (
+          <MessageItem
+            key={message.messageId}
+            message={message}
+            index={index}></MessageItem>
         )}
         ref={flatListRef}
         refreshing={false}
