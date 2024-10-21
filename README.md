@@ -1,79 +1,13 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+架构：serverless + rn + nextjs，云函数，云数据库
 
-# Getting Started
+登录：双token无感刷新，前后端路由守卫，前端封装组件，后端中间件
 
-> **Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+过滤：用户精确筛选
 
-## Step 1: Start the Metro Server
+用户管理：个人信息编辑，退出登录，修改密码，注销
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+聊天：
+1.websocket即时通讯
+2.websocket断线重连，找回丢失信息，替代客户端心跳检测3.滚动优化：初始化消息记录，通过防抖检测内容是否渲染完毕，加载完后再滚动到底部4.键盘弹出时，动态调整列表容器的高度，然后滚动到底部5.接或发消息的时候，也要等消息渲染完毕再滚动到底部6.历史聊天记录，每次重新进来只加载十条，整一个的用户体验，都是自己去考虑的7.后面考虑做语音通话，也是通过websocket监听设备的录音，转换成二进制的数据实时发到对方的客户端
 
-To start Metro, run the following command from the _root_ of your React Native project:
-
-```bash
-# using npm
-npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Start your Application
-
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
-
-```bash
-# using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### For iOS
-
-```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
-
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
-
-## Step 3: Modifying your App
-
-Now that you have successfully run the app, let's modify it.
-
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+首屏优化：1.优先请求必要接口，不并发请求多个数据，让首屏最快的加载出来2.云函数定时预热，loading提示，后续准备做骨架屏3.列表懒加载和分页，初始化，刷新，加载，复用一个接口，自己封装的分页器和Tag标签展示4.适配不同机型，tabBar高度全面屏和非全面屏，算法不一样，通过算设备宽高比得出是否全面屏，多台真机测试，平板上也没问题
