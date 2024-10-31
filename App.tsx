@@ -17,9 +17,11 @@ import Chat from './pages/chat';
 import RouterGuard from './component/RouterGuard';
 import ChatDetail from './pages/chat/chatDetail.tsx';
 import { useChatList } from './store/chatList.ts';
-import { setGlobalTip, useGlobalTip } from './store/globalTip.ts';
+import CreateActivity from './pages/activity/createActivity/index.tsx';
+import ActivityDetail from './pages/activity/activityDetail/index.tsx';
+import Activity from './pages/activity/index.tsx';
 import ProgressTips from './component/ProgressTips.tsx';
-import useUpdateEffect from './utils/useUpdateEffect.ts';
+import useUpdateEffect from './hook/useUpdateEffect.ts';
 const appKey = '4NARp5NHhOThVMRe4gzZZKFh';
 const pushyClient = new Pushy({
   appKey,
@@ -43,6 +45,16 @@ const RouterGuardWithFilter = () => (
 const RouterGuardWithChatDetail = () => (
   <RouterGuard>
     <ChatDetail />
+  </RouterGuard>
+);
+const RouterGuardWithCreateActivity = () => (
+  <RouterGuard>
+    <CreateActivity />
+  </RouterGuard>
+);
+const RouterGuardWithActivityDetail = () => (
+  <RouterGuard>
+    <ActivityDetail />
   </RouterGuard>
 );
 function HomeTabsRouter() {
@@ -69,6 +81,8 @@ function HomeTabsRouter() {
             iconName = 'aliwangwang';
           } else if (route.name === 'Chat') {
             iconName = 'message';
+          } else if (route.name === 'Activity') {
+            iconName = 'home';
           }
 
           return <Icon name={iconName} size={size} color={color} />;
@@ -77,13 +91,13 @@ function HomeTabsRouter() {
         tabBarInactiveTintColor: 'gray',
       })}>
       <Tab.Screen
-        name="Me"
-        options={{ title: '我', headerShown: false }}
-        component={Me}
+        name="Activity"
+        options={{ title: '大厅', headerShown: false }}
+        component={Activity}
       />
       <Tab.Screen
         name="Home"
-        options={{ title: '发现', headerShown: false }}
+        options={{ title: '搭子', headerShown: false }}
         component={Home}
       />
       <Tab.Screen
@@ -95,7 +109,11 @@ function HomeTabsRouter() {
         }}
         component={Chat}
       />
-
+      <Tab.Screen
+        name="Me"
+        options={{ title: '我', headerShown: false }}
+        component={Me}
+      />
       {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
     </Tab.Navigator>
   );
@@ -144,6 +162,16 @@ export default function App() {
               options={{ headerShown: false }}
               name="ChatDetail"
               component={RouterGuardWithChatDetail}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="ActivityDetail"
+              component={RouterGuardWithActivityDetail}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="CreateActivity"
+              component={RouterGuardWithCreateActivity}
             />
           </RouterStack.Navigator>
         </NavigationContainer>
