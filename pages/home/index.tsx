@@ -9,7 +9,9 @@ import {
   NativeModules,
   Platform,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import {
   Tabs,
   Card,
@@ -18,6 +20,7 @@ import {
   Icon,
   Radio,
   ActivityIndicator,
+  Toast,
 } from '@ant-design/react-native';
 import websocketConfig from '../../config/websocket';
 import tagRgbaColor from '../../config/tagRgbaColor';
@@ -36,9 +39,10 @@ import {
   queryUserBasis,
   createMessage,
   updateChatList,
+  queryMessagesByChatIds,
 } from '../../api/user';
 import sleep from '../../utils/sleep';
-import useUpdateEffect from '../../utils/useUpdateEffect';
+import useUpdateEffect from '../../hook/useUpdateEffect';
 import { useNavigation } from '@react-navigation/native';
 import { useMessagesList, setMessagesList } from '../../store/messagesList';
 import { setChatList, useChatList } from '../../store/chatList';
@@ -49,32 +53,33 @@ import DefaultText from '../../component/DefaultText';
 import { useUserId, setUserId } from '../../store/userId';
 import { setWebsocket, useWebsocket } from '../../store/websocket';
 import wsConnect from '../../utils/websocket';
-const { StatusBarManager } = NativeModules;
-const STATUS_BAR_HEIGHT =
-  Platform.OS === 'android' ? StatusBar.currentHeight : StatusBarManager.HEIGHT;
-const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-const flatListMinHeight =
-  screenHeight - basic.headerHeight - basic.tabBarHeight - STATUS_BAR_HEIGHT;
 
 const tabs = [
   {
     title: '推荐',
   },
   {
-    title: '自定义',
+    title: '过滤',
   },
 ];
 
 export default function Home() {
+  const route = useRoute();
+  const { StatusBarManager } = NativeModules;
+  const STATUS_BAR_HEIGHT =
+    Platform.OS === 'android'
+      ? StatusBar.currentHeight
+      : StatusBarManager.HEIGHT;
+  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const flatListMinHeight =
+    screenHeight - basic.headerHeight - basic.tabBarHeight;
   const userId = useUserId();
-  const [isFilterListRefreshing, setIsFilterListRefreshing] = useState(true);
-  const [isRecommandListRefreshing, setIsRecommandListRefreshing] =
-    useState(true);
+  const isFirstLoading = useRef(true);
   const websocket = useWebsocket();
   const [filterTotal, setFilterTotal] = useState(0);
   const [recommandTotal, setRecommandTotal] = useState(0);
   const [filterPageNum, setFilterPageNum] = useState({ num: 1 });
-  const [num, setNum] = useState<number>(1);
+  // const [num, setNum] = useState<number>(1);
   // 设计成对象是为了让他每一次setState都刷新，如果设计成number，那么在设置相同number的时候不会刷新列表
   const [recommandPageNum, setRecommandPageNum] = useState({
     num: 1,
@@ -86,189 +91,29 @@ export default function Home() {
   const navigation = useNavigation<any>();
   const [recommandUserList, setRecommandUserList] = useState<any[]>([]);
   const [filterUserList, setFilterUserList] = useState<any[]>([]);
-  const [isRecommandListLoading, setIsRecommandListLoading] = useState(false);
-  const [isFilterListLoading, setIsFilterListLoading] = useState(true);
   const recommandListRef = useRef<any>();
   const filterListRef = useRef<any>();
-  // 这里相当于整个项目初始化的逻辑
-  // 每次进应用看一下是否已有登录或者刷新token，更新登录信息
-  useEffect(() => {
-    const helper = async () => {
-      const id = await storage.getItem('id');
-      console.log('id==-====', id);
-      if (id) {
-        try {
-          const res = await queryUserBasis({ id });
-          setMyInfo(res.data);
-        } catch (e) {
-          console.log(e);
-        }
-      } else {
-        setMyInfo({});
-      }
-    };
-    helper();
-  }, []);
-
-  const closeWebsocket = React.useCallback(() => {
-    console.log('websocket close');
-    websocket?.close();
-    setWebsocket(null);
-  }, [websocket]);
-  // 组件销毁关闭连接
-  useEffect(() => {
-    return closeWebsocket;
-  }, []);
-
-  // userId变化重新连接
-  useEffect(() => {
-    if (!userId) {
-      websocket?.close();
-      setWebsocket(null);
-    } else {
-      const ws = wsConnect({
-        userId,
-      });
-      console.log('setWebsocket');
-      setWebsocket(ws);
-    }
-  }, [userId]);
 
   useEffect(() => {
-    // websocket断线重连（切除后台太久或者其他原因）
-    if (websocket) {
-      websocket.onclose = (error: any) => {
-        const ws = wsConnect({
-          userId,
-        });
-        console.log('setWebsocket, reset');
-        setWebsocket(ws);
-      };
-    }
-  }, [userId, websocket]);
-
-  useEffect(() => {
-    const wsOnMessage = async (event: any) => {
-      const obj = JSON.parse(event.data);
-      console.log('接收服务端消息:');
-      console.log(obj);
-      const type = obj.type;
-      switch (type) {
-        case 'init':
-          break;
-        case 'sendMessage':
-          try {
-            const isPicture = (value: string) =>
-              value.startsWith('data:image/png;base64') && value.length > 1000;
-            const newMessage = obj.data;
-            const {
-              content,
-              chatId,
-              shouldUpdateUnReadCount,
-              lastMessageTime,
-            } = obj.data;
-            console.log('shouldUpdateUnReadCount', obj.data);
-            console.log('newMessage', newMessage);
-            const oldMessages = messagesList.find(
-              (item: any) => item.chatId === chatId,
-            );
-            // 多一个判断因为类型问题，其实oldMessages一定有的
-            if (oldMessages) {
-              oldMessages.messages = oldMessages?.messages.concat(newMessage);
-            }
-            // console.log('messagesList----, 更新messagesList', messagesList);
-            setMessagesList([...messagesList]);
-
-            // 更新chatList
-            // 判断是否图片，是图片的话显示文字版图片
-            const lastMessage = isPicture(content) ? '【图片】' : content;
-            const chatItemData = chatList.find(
-              (item: any) => item.chatId === chatId,
-            );
-            chatItemData.lastMessage = lastMessage;
-            chatItemData.lastMessageTime = lastMessageTime;
-            // 根据websocket的信息决定是否更新未读信息，不要重新拉最新数据，浪费接口
-            // console.log('newChatItemData', newChatItemData)
-            // console.log('chatItemData', chatItemData)
-            if (shouldUpdateUnReadCount) {
-              chatItemData.unReadCount = chatItemData.unReadCount
-                ? chatItemData.unReadCount + 1
-                : 1;
-            }
-            // 把最新消息放到消息列表首位
-            const newChatList = [
-              chatItemData,
-              ...chatList?.filter(item => item !== chatItemData),
-            ];
-            console.log('刷新chatList');
-            setChatList(newChatList);
-          } catch (e) {
-            console.log(e);
-          }
-          break;
-        case 'createChat':
-          try {
-            // 收到创建聊天框的消息
-            setChatList([obj.data.newPartnerChatItemData, ...chatList]);
-            // 还要把messageList也加一条信息，这里后续可以考虑监听chatList.length来做messageList的同步
-            setMessagesList([
-              ...messagesList,
-              {
-                chatId: obj.data.newPartnerChatItemData.chatId,
-                messages: [],
-              },
-            ]);
-          } catch (e) {
-            console.error(e);
-          }
-      }
-    };
-    if (websocket) websocket.onmessage = wsOnMessage;
-  }, [messagesList, chatList, websocket]);
-
-  useUpdateEffect(() => {
     // 如果id和原来一样是不会触发更新的，所以修改个人信息不会导致更新
-    const helper = async () => {
-      setUserId(myInfo.id);
-      try {
-        // 未登录直接返回所有数据
-        // 这里要用myInfo.id，不然出问题，还要依赖userId
-        if (!myInfo.id) {
-          storage.setItem('id', '');
-          storage.setItem('accessToken', '');
-          storage.setItem('refreshToken', '');
-          setRecommandPageNum({ num: 1 });
-          setFilterPageNum({ num: 1 });
-          setChatList([]);
-          setMessagesList([]);
-        } else {
-          await refreshFilterList();
-          setFilterPageNum({ num: 1 });
-          setRecommandPageNum({ num: 1 });
-          recommandUserList.length &&
-            recommandListRef?.current?.scrollToIndex({
-              viewPosition: 0,
-              index: 0,
-            });
-          // 刷新聊天列表和历史详情,存储到全局
-          const chatListRes = await queryChatList({ userId: myInfo.id });
-          setChatList(
-            chatListRes.data.sort(
-              (a, b) => b.lastMessageTime - a.lastMessageTime,
-            ),
-          );
-          const messagesListReq = chatListRes.data.map(async (item: any) => {
-            return queryMessages({ chatId: item.chatId });
+    try {
+      // 未登录直接返回所有数据
+      // 这里要用myInfo.id，不然出问题，还要依赖userId
+      if (!myInfo.id) {
+        setRecommandPageNum({ num: 1 });
+        setFilterPageNum({ num: 1 });
+      } else {
+        setRecommandPageNum({ num: 1 });
+        recommandUserList.length &&
+          recommandListRef?.current?.scrollToIndex({
+            viewPosition: 0,
+            index: 0,
           });
-          const messagesListPromise = await Promise.all(messagesListReq);
-          console.log('messagesListPromise', messagesListPromise);
-          setMessagesList(messagesListPromise.map(item => item.data));
-        }
-      } catch (e) {
-        console.log('e--', e);
+        setFilterPageNum({ num: 1 });
       }
-    };
-    helper();
+    } catch (e) {
+      console.log('e--', e);
+    }
   }, [myInfo]);
 
   const UserItem = (props: any) => {
@@ -283,36 +128,43 @@ export default function Home() {
       status,
       customTags = [],
     } = props.userData;
-
     const clickChat = async () => {
-      console.log('myInfo.id', myInfo.id);
       try {
         let newChatItemData: any = chatList?.find(
           item => item.partnerId === id,
         );
         if (newChatItemData) {
-          // chat = messagesList?.find(item => item.chatId === chatId)?.messages ?? []
+          navigation.navigate('ChatDetail', { chatItemData: newChatItemData });
         } else {
+          const lastMessageTime = new Date();
           const chatId = uuidv4();
           newChatItemData = {
             chatId,
             partnerId: id,
-            partnerAvatarURL: avatarURL,
-            partnerName: name,
+            lastMessage: '',
+            lastMessageTime,
           };
-          const newChatList = [newChatItemData, ...chatList];
-          console.log('myInfo.id', myInfo.id);
-          const res = await updateChatList({
+          navigation.navigate('ChatDetail', {
+            chatItemData: { ...newChatItemData, partnerInfo: props.userData },
+          });
+          const newChatList = [
+            { ...newChatItemData, partnerInfo: props.userData },
+            ...chatList,
+          ];
+
+          // 远端不需要伙伴信息，本地需要,远端返回的时候会自己拿id查询伙伴的个人信息
+          await updateChatList({
             userId: myInfo.id,
-            chatList: newChatList,
+            chatList: [newChatItemData, ...chatList],
           });
 
           // 通知websocket替对方更新聊天列表
           const newPartnerChatItemData = {
             chatId,
             partnerId: myInfo.id,
-            partnerAvatarURL: myInfo.avatarURL,
-            partnerName: myInfo.name,
+            partnerInfo: myInfo,
+            lastMessage: '',
+            lastMessageTime,
           };
           websocket.send(
             JSON.stringify({
@@ -323,7 +175,6 @@ export default function Home() {
               },
             }),
           );
-
           setChatList(newChatList);
           setMessagesList([
             ...messagesList,
@@ -333,7 +184,6 @@ export default function Home() {
             },
           ]);
         }
-        navigation.navigate('ChatDetail', { chatItemData: newChatItemData });
       } catch (e) {
         console.log(e);
       }
@@ -428,14 +278,17 @@ export default function Home() {
               <BasicButton
                 backgroundColor="orange"
                 wingBlank={40}
-                onPress={() => clickChat()}>
+                onPress={clickChat}>
                 打个招呼
               </BasicButton>
               <BasicButton
                 backgroundColor="yellowgreen"
                 wingBlank={40}
                 onPress={() =>
-                  navigation.navigate('Others', { userItem: props.userData })
+                  navigation.navigate('Others', {
+                    userItem: props.userData,
+                    originPage: route.name,
+                  })
                 }>
                 查看主页
               </BasicButton>
@@ -448,11 +301,10 @@ export default function Home() {
 
   // 封装了过滤操作
   const refreshFilterList = async () => {
+    console.log('refreshFilterList');
     if (!myInfo.id) {
-      setIsFilterListRefreshing(true);
       setFilterUserList([]);
       setFilterTotal(0);
-      setIsFilterListRefreshing(false);
       return;
     }
     const payload: any = {
@@ -460,9 +312,9 @@ export default function Home() {
       pageInfo: {
         pageNum: filterPageNum.num,
       },
+      userId: myInfo.id,
     };
     // 这里还是要过滤一遍,因为filterInfo存着所有的筛选信息
-    setIsFilterListRefreshing(true);
     for (let key in myInfo.filterInfo) {
       // 不为空且在筛选条件里面的，放入payload
       if (
@@ -473,18 +325,22 @@ export default function Home() {
       }
     }
     const res = await queryFilterList(payload);
-    console.log('res', res);
     setFilterUserList(res.data.userBasisList);
     setFilterTotal(res.data.pageInfo.total);
     filterUserList.length &&
       filterListRef.current?.scrollToIndex({ viewPosition: 0, index: 0 });
-    setIsFilterListRefreshing(false);
   };
 
   const extendRecommandList = async () => {
+    console.log('extendRecommandList');
     try {
       // 后面改成请求推荐算法的接口，和filter分开
-      setIsRecommandListRefreshing(true);
+      let key;
+      if (isFirstLoading.current) {
+        key = Toast.loading({
+          content: <></>,
+        });
+      }
       // 已登录推荐算法：推荐年龄上下浮动五岁的
 
       const payload: any = {
@@ -495,18 +351,20 @@ export default function Home() {
           maxAge: myInfo.age + 5,
           minAge: myInfo.age - 5,
         },
+        userId: myInfo.id,
       };
       const res = await queryFilterList(payload);
       setRecommandTotal(res.data.pageInfo.total);
       // 如果页码为1，那么可能是刷新导致的，这种情况不要清空数组再赋值，会有闪烁，一次性改掉
-      console.log('recommandPageNum.num', recommandPageNum.num);
       if (recommandPageNum.num !== 1) {
         setRecommandUserList([...recommandUserList, ...res.data.userBasisList]);
       } else {
         setRecommandUserList(res.data.userBasisList);
       }
-
-      setIsRecommandListRefreshing(false);
+      if (isFirstLoading.current) {
+        Toast.remove(key);
+        isFirstLoading.current = false;
+      }
     } catch (e) {
       console.log(e);
     }
@@ -527,23 +385,25 @@ export default function Home() {
   return (
     <>
       <Tabs
-        distanceToChangeTab={0.5}
         tabs={tabs}
         renderTab={tab => (
           <View style={{ flexDirection: 'row', height: basic.headerHeight }}>
             <DefaultText
               style={{
-                marginLeft: tab.title === '自定义' ? 30 : 0,
+                marginLeft: tab.title === '过滤' ? 30 : 0,
                 lineHeight: basic.headerHeight,
               }}>
               {tab.title}
             </DefaultText>
-            {tab.title === '自定义' ? (
+            {tab.title === '过滤' ? (
               <Icon
                 name="bars"
                 style={{
-                  // position: 'relative',
-                  // left: 0,
+                  position: 'relative',
+                  left: 20,
+                  color: 'white',
+                  borderRadius: 10,
+                  backgroundColor: 'orange',
                   paddingHorizontal: 12,
                   lineHeight: basic.headerHeight,
                 }}
@@ -556,28 +416,19 @@ export default function Home() {
         <FlatList
           ref={recommandListRef}
           // 因为状态栏高度计算不对，所以需要扩充flatListMinHeight，再加上paddingBottom撑开容器
-          style={{ height: flatListMinHeight + 30, flexGrow: 0 }}
+          style={{ height: flatListMinHeight + 60, flexGrow: 0 }}
           contentContainerStyle={{
-            paddingBottom: 30,
+            paddingBottom: 60,
             backgroundColor: 'white',
-            minHeight: flatListMinHeight + 30,
+            minHeight: flatListMinHeight + 60,
           }}
-          refreshing={isRecommandListRefreshing}
+          refreshing={false}
           onEndReached={() => {
-            // 目前先做成和分页一样的，后面做成随机和，或者按照什么算法推荐不重复的人群
-            console.log('到达底部');
-            setRecommandPageNum({ num: recommandPageNum.num + 1 });
+            // 一进来会自动触发一次到达底部，导致不必要的请求，需要判读一下长度
+            console.log('到达底部', recommandUserList.length);
+            if (recommandUserList.length)
+              setRecommandPageNum({ num: recommandPageNum.num + 1 });
           }}
-          ListEmptyComponent={
-            <DefaultText
-              style={{
-                textAlign: 'center',
-                textAlignVertical: 'center',
-                height: flatListMinHeight,
-              }}>
-              {!isRecommandListRefreshing ? '暂无数据' : ''}
-            </DefaultText>
-          }
           onRefresh={async () => {
             setRecommandPageNum({ num: 1 });
           }}
@@ -586,12 +437,16 @@ export default function Home() {
           keyExtractor={(item: any) => item.id}
         />
 
-        {/* 自定义 */}
+        {/* 过滤 */}
         <FlatList
-          style={{ height: flatListMinHeight + 30, flexGrow: 0 }}
+          style={{ height: flatListMinHeight + 60, flexGrow: 0 }}
           ref={filterListRef}
           // 要加上底部分页器的高度
-          contentContainerStyle={{ minHeight: flatListMinHeight + 30 + 60 }}
+          contentContainerStyle={{
+            paddingBottom: 50,
+            backgroundColor: 'white',
+            minHeight: flatListMinHeight + 60 + 60,
+          }}
           ListFooterComponentStyle={{ height: 60 }}
           ListEmptyComponent={
             <DefaultText
@@ -600,7 +455,7 @@ export default function Home() {
                 textAlignVertical: 'center',
                 height: flatListMinHeight,
               }}>
-              {!isFilterListRefreshing ? '暂无数据' : ''}
+              暂无数据
             </DefaultText>
           }
           ListFooterComponent={
@@ -618,7 +473,7 @@ export default function Home() {
               }
             />
           }
-          refreshing={isFilterListRefreshing}
+          refreshing={false}
           onRefresh={async () => {
             await refreshFilterList();
           }}
