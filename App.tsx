@@ -15,13 +15,16 @@ import basic from './config/basic';
 import Setting from './pages/me/setting';
 import Chat from './pages/chat';
 import RouterGuard from './component/RouterGuard';
-import ChatDetail from './pages/chat/chatDetail.tsx';
+import ChatDetail from './pages/chat/chatDetail/index.tsx';
 import { useChatList } from './store/chatList.ts';
 import CreateActivity from './pages/activity/createActivity/index.tsx';
 import ActivityDetail from './pages/activity/activityDetail/index.tsx';
 import Activity from './pages/activity/index.tsx';
 import ProgressTips from './component/ProgressTips.tsx';
 import useUpdateEffect from './hook/useUpdateEffect.ts';
+import ActivityLocation from './pages/activity/createActivity/activityLocation/index.tsx';
+
+// 热更新
 const appKey = '4NARp5NHhOThVMRe4gzZZKFh';
 const pushyClient = new Pushy({
   appKey,
@@ -57,9 +60,13 @@ const RouterGuardWithActivityDetail = () => (
     <ActivityDetail />
   </RouterGuard>
 );
+const RouterGuardWithActivityLocation = () => (
+  <RouterGuard>
+    <ActivityLocation />
+  </RouterGuard>
+);
 function HomeTabsRouter() {
   const chatList = useChatList();
-  console.log('HomeTabsRouter刷新');
   const totalUnReadCount = chatList?.reduce((pre, cur) => {
     if (cur.unReadCount) {
       return pre + cur.unReadCount;
@@ -172,6 +179,11 @@ export default function App() {
               options={{ headerShown: false }}
               name="CreateActivity"
               component={RouterGuardWithCreateActivity}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="ActivityLocation"
+              component={RouterGuardWithActivityLocation}
             />
           </RouterStack.Navigator>
         </NavigationContainer>

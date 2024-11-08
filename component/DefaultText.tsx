@@ -1,9 +1,16 @@
 import { Text } from 'react-native';
 import basic from '../config/basic';
 export default (props: any) => {
-  const { style = {}, onPress = undefined, children } = props;
+  const { style = {}, onPress = undefined, isCenter = false, children } = props;
   return (
-    <Text style={{ color: basic.defaultFontColor, ...style }} onPress={onPress}>
+    <Text
+      style={{
+        textAlign: isCenter ? 'center' : 'unset',
+        textAlignVertical: isCenter ? 'center' : 'unset',
+        color: basic.defaultFontColor,
+        ...style,
+      }}
+      onPress={onPress}>
       {children}
     </Text>
   );
