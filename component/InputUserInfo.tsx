@@ -55,17 +55,22 @@ export default function InputUserInfo(props: any) {
   const myInfo = useMyInfo();
   const [ifShowModal, setIfShowModal] = useState(false);
   const [filterConds, setFilterConds] = useState<string[]>([]);
+  const [gameListLength, setGameListLength] = useState(
+    myInfo.gameList?.length ?? 0,
+  );
   const clickCloseTag = (value: any) => {
-    form.setFieldValue(
-      'customTags',
-      form.getFieldValue('customTags')?.filter((item: any) => item !== value),
-    );
+    const newGameList = form
+      .getFieldValue('gameList')
+      ?.filter((item: any) => item !== value);
+    form.setFieldValue('gameList', newGameList);
+    setGameListLength(newGameList.length);
   };
   const clickSearchBarAdd = (value: any) => {
     if (value === undefined || value === '') return Toast.fail('输入为空');
-    const customTags = form.getFieldValue('customTags') ?? [];
-    if (customTags.indexOf(value) !== -1) return Toast.fail('添加重复标签');
-    form.setFieldValue('customTags', customTags.concat(value));
+    const gameList = form.getFieldValue('gameList') ?? [];
+    if (gameList.indexOf(value) !== -1) return Toast.info('不要重复添加哦');
+    form.setFieldValue('gameList', gameList.concat(value));
+    setGameListLength(gameList.concat(value).length);
     setTagSearchVarValue(undefined);
   };
   const TagList = (props: any) => {
@@ -229,7 +234,7 @@ export default function InputUserInfo(props: any) {
           {mode === Mode.EDIT ? (
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
-              label={<DefaultText style={{ fontSize: 16 }}>姓名</DefaultText>}
+              label={<DefaultText style={{ fontSize: 16 }}>昵称</DefaultText>}
               name="name">
               <Input
                 style={{ height: 40, backgroundColor: basic.backgroundColor }}
@@ -303,7 +308,7 @@ export default function InputUserInfo(props: any) {
           ) : null}
 
           <View>
-            <Form.Item
+            {/* <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
               label={<DefaultText style={{ fontSize: 16 }}>籍贯</DefaultText>}
               name="originalAddress"
@@ -311,7 +316,7 @@ export default function InputUserInfo(props: any) {
                 setIfShowOriginalAddressPicker(true);
               }}>
               <ValueText></ValueText>
-            </Form.Item>
+            </Form.Item> */}
             <Picker
               value={form.getFieldValue('originalAddress')}
               data={addressOptions}
@@ -354,7 +359,7 @@ export default function InputUserInfo(props: any) {
             ) : null}
           </View>
 
-          <View>
+          {/* <View>
             <Form.Item
               style={{ height: 40, backgroundColor: basic.backgroundColor }}
               label={
@@ -372,7 +377,7 @@ export default function InputUserInfo(props: any) {
                 style={{ position: 'absolute', right: 0, top: 8 }}
                 onChange={e => clickFilterCondsCheck(e, 'status')}></Checkbox>
             ) : null}
-          </View>
+          </View> */}
 
           <Picker
             data={status}
@@ -381,21 +386,53 @@ export default function InputUserInfo(props: any) {
             visible={ifShowStatusPicker}
             onDismiss={() => setIfShowStatusPicker(false)}
             onOk={statusOk}></Picker>
+
+          <DefaultText style={{ fontSize: 15, margin: 14 }}>
+            主玩游戏
+          </DefaultText>
+          {!form.getFieldValue('gameList')?.length ? (
+            <DefaultText style={{ fontSize: 15 }} isCenter>
+              快去添加游戏吧！
+            </DefaultText>
+          ) : null}
+          <Form.Item
+            style={{ backgroundColor: basic.backgroundColor }}
+            name="gameList">
+            <TagList></TagList>
+          </Form.Item>
+
           <SearchBar
             style={{ backgroundColor: basic.backgroundColor }}
-            placeholder="添加自定义标签"
+            placeholder="添加自定义游戏"
             value={tagSearchVarValue}
             showCancelButton={true}
             onSubmit={clickSearchBarAdd}
             cancelText="添加"
             onChange={value => setTagSearchVarValue(value)}
+            // 这个才是添加回调，只是把label改成了添加
             onCancel={clickSearchBarAdd}></SearchBar>
-          <WhiteSpace size="lg"></WhiteSpace>
-          <Form.Item
-            style={{ backgroundColor: basic.backgroundColor }}
-            name="customTags">
-            <TagList></TagList>
-          </Form.Item>
+
+          <DefaultText style={{ fontSize: 15, margin: 14 }}>
+            热门游戏
+          </DefaultText>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              marginHorizontal: 14,
+            }}>
+            {basic.defaultGameList?.map((item: string, index: number) => (
+              <View key={item}>
+                <Tag
+                  color={basic.themeColor}
+                  style={{ marginRight: 8, height: 40 }}
+                  onClick={() => clickSearchBarAdd(item)}>
+                  {item}
+                </Tag>
+                <WhiteSpace size="md" />
+              </View>
+            ))}
+          </View>
 
           {/* {isShowFormItem('filterConds') ? (
             <>

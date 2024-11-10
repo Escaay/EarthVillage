@@ -22,11 +22,18 @@ import HeaderBar from '../component/HeaderBar';
 import { Pressable } from 'react-native';
 import { queryUserBasis } from '../api/user';
 import DefaultText from './DefaultText';
+import basic from '../config/basic';
 // const randomRgbaColor = () => {
 //   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
 // };
 import { useMyInfo } from '../store/myInfo';
-export default function UserDetail({ userItem }: { userItem: any }) {
+export default function UserDetail({
+  userItem,
+  clickChat = () => {},
+}: {
+  userItem: any;
+  clickChat?: any;
+}) {
   // 没传userId就是自己的主页，后端直接通过token里面拿到id返回个人信息
   const myInfo = useMyInfo();
   const isMe = userItem.id === myInfo.id;
@@ -70,28 +77,66 @@ export default function UserDetail({ userItem }: { userItem: any }) {
                   url: userItem.avatarURL,
                   props: {
                     saveToLocalByLongPress: true,
+                    source: userItem.avatarURL
+                      ? undefined
+                      : require('../assets/img/avatar.png'),
                   },
                 },
               ]}
             />
           </Modal>
-          <Pressable onPress={() => setIsPreviewAvatar(true)}>
-            <Image
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Pressable
+              onPress={() => setIsPreviewAvatar(true)}
+              style={{ flex: 3 }}>
+              <Image
+                style={{
+                  width: 90,
+                  height: 90,
+                  borderRadius: 45,
+                }}
+                source={
+                  userItem?.avatarURL
+                    ? {
+                        uri: userItem.avatarURL,
+                      }
+                    : require('../assets/img/avatar.png')
+                }
+              />
+            </Pressable>
+            <View
               style={{
-                width: 100,
-                height: 100,
-                margin: 'auto',
-                borderRadius: 50,
-              }}
-              source={
-                userItem?.avatarURL
-                  ? {
-                      uri: userItem.avatarURL,
-                    }
-                  : require('../assets/img/avatar.png')
-              }
-            />
-          </Pressable>
+                flex: 7,
+                justifyContent: 'space-between',
+                marginLeft: 20,
+                height: 80,
+              }}>
+              <DefaultText>{userItem.name}</DefaultText>
+              <View style={{ flexDirection: 'row' }}>
+                <DefaultText>{userItem.age}岁</DefaultText>
+                <Icon
+                  name={userItem.gender === '男' ? 'man' : 'woman'}
+                  style={{
+                    position: 'relative',
+                    top: 1,
+                    fontSize: 18,
+                    color:
+                      userItem.gender === '男'
+                        ? basic.manIconColor
+                        : basic.womanIconColor,
+                  }}></Icon>
+              </View>
+              <DefaultText>
+                <Icon
+                  name="environment"
+                  size="xs"
+                  style={{ position: 'relative', top: 1 }}></Icon>
+                {userItem.currentAddress
+                  ?.filter(item => item !== '全部')
+                  .join('-')}
+              </DefaultText>
+            </View>
+          </View>
           {isMe ? (
             <>
               <WhiteSpace size="md" />
@@ -99,7 +144,7 @@ export default function UserDetail({ userItem }: { userItem: any }) {
               <View
                 style={{
                   flexDirection: 'row',
-                  justifyContent: 'space-around',
+                  justifyContent: 'flex-start',
                 }}>
                 <BasicButton
                   backgroundColor="yellowgreen"
@@ -124,7 +169,10 @@ export default function UserDetail({ userItem }: { userItem: any }) {
                 <BasicButton backgroundColor="pink" wingBlank={40}>
                   交换微信
                 </BasicButton>
-                <BasicButton backgroundColor="orange" wingBlank={40}>
+                <BasicButton
+                  backgroundColor="orange"
+                  wingBlank={40}
+                  onPress={clickChat}>
                   打个招呼
                 </BasicButton>
               </View>
@@ -132,27 +180,34 @@ export default function UserDetail({ userItem }: { userItem: any }) {
           )}
           <WhiteSpace size="md" />
           <WhiteSpace size="md" />
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <DefaultText>姓名：{userItem.name}</DefaultText>
-            <DefaultText>年龄：{userItem.age}</DefaultText>
-            <DefaultText>性别：{userItem.gender}</DefaultText>
-          </View>
-          <WhiteSpace size="md" />
-          <DefaultText>
+          {/* <DefaultText>
             籍贯：
             {userItem.originalAddress
               ?.filter(item => item !== '全部')
               .join('-')}
-          </DefaultText>
+          </DefaultText> */}
+
           <WhiteSpace size="md" />
-          <DefaultText>
-            现居：
-            {userItem.currentAddress?.filter(item => item !== '全部').join('-')}
-          </DefaultText>
+          <DefaultText style={{ fontSize: 15 }}>主玩游戏</DefaultText>
           <WhiteSpace size="md" />
-          <DefaultText>目前状态：{userItem.status}</DefaultText>
           <WhiteSpace size="md" />
+          {userItem.gameList.length === 0 ? (
+            <DefaultText style={{ fontSize: 15 }} isCenter>
+              TA还未设置哦
+            </DefaultText>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {userItem.gameList?.map((item: string, index: number) => (
+                <View key={item}>
+                  <Tag color={tagRgbaColor[index]} style={{ marginRight: 8 }}>
+                    {item}
+                  </Tag>
+                  <WhiteSpace size="md" />
+                </View>
+              ))}
+            </View>
+          )}
+          {/* <WhiteSpace size="md" />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             {userItem.customTags?.map((item: string, index: number) => (
               <View key={item}>
@@ -163,7 +218,7 @@ export default function UserDetail({ userItem }: { userItem: any }) {
               </View>
             ))}
           </View>
-          <WhiteSpace size="md" />
+          <WhiteSpace size="md" /> */}
         </View>
       ) : (
         <Login />
