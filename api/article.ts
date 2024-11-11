@@ -23,3 +23,8 @@ export const updateArticle = async (payload: any) => {
   const res = await axios.post('/article/updateArticle', payload);
   return res;
 };
+
+export const createArticleComment = async (payload: any) => {
+  const res = await axios.post('/article/createArticleComment', payload);
+  return res;
+};

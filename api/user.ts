@@ -64,7 +64,7 @@ export const writeOff = async (payload: any) => {
   return res;
 };
 
-export const updateUserLogin = async (payload: any) => {
+export const query = async (payload: any) => {
   const res = await axios.post('/user/updateUserLogin', payload);
   return res;
 };
