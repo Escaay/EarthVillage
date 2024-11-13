@@ -3,7 +3,7 @@ export const uploadSingleImg = async (
   isMultiple: boolean = true,
   width?: any,
   height?: any,
-) => {
+): Promise<any> => {
   try {
     const img = await ImagePicker.openPicker({
       width,
