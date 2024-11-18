@@ -22,47 +22,72 @@ import HeaderBar from '../component/HeaderBar';
 import { Pressable } from 'react-native';
 import { queryUserBasis } from '../api/user';
 import DefaultText from './DefaultText';
+import {
+  useUserArticleList,
+  setUserArticleList,
+} from '../store/userArticleList';
 import basic from '../config/basic';
+import useScreenSize from '../hook/useScreenSize';
 // const randomRgbaColor = () => {
 //   return tagRgbaColor[randomInteger(0, tagRgbaColor.length - 1)];
 // };
 import { useMyInfo } from '../store/myInfo';
+import { queryArticleList } from '../api/article';
+import ArticleItem from './ArticleItem';
 export default function UserDetail({
   userItem,
   clickChat = () => {},
+  hasTabBar = false,
 }: {
   userItem: any;
   clickChat?: any;
+  hasTabBar?: boolean;
 }) {
-  // 没传userId就是自己的主页，后端直接通过token里面拿到id返回个人信息
   const myInfo = useMyInfo();
   const isMe = userItem.id === myInfo.id;
+  const userArticleList = useUserArticleList();
+  const [isInit, setIsInit] = useState(true);
+  const articleList = isMe
+    ? userArticleList.myArticleList
+    : userArticleList.othersArticleList;
   const [isPreviewAvatar, setIsPreviewAvatar] = useState(false);
   const navigation = useNavigation<any>();
-  const clickSetting = () => {
-    navigation.navigate('Setting');
-  };
+  const { screenHeight, screenWidth } = useScreenSize();
+  const scrollViewHeight = hasTabBar
+    ? screenHeight - basic.headerHeight - basic.tabBarHeight
+    : screenHeight - basic.headerHeight;
   const clickEdit = () => {
     navigation.navigate('Edit');
   };
+
+  useEffect(() => {
+    const helper = async () => {
+      const res = await queryArticleList({ userId: userItem.id });
+      const newUserArticleList = { ...userArticleList };
+      if (isMe) {
+        newUserArticleList.myArticleList = res.data;
+      } else {
+        newUserArticleList.othersArticleList = res.data;
+      }
+      setUserArticleList(newUserArticleList);
+      setIsInit(false);
+    };
+    if (userItem.id) {
+      helper();
+    } else {
+      setIsInit(false);
+    }
+    return () => {
+      const newUserArticleList = { ...userArticleList };
+      newUserArticleList.othersArticleList = [];
+      setUserArticleList(newUserArticleList);
+    };
+  }, [userItem.id]);
+
   return (
-    <ScrollView contentContainerStyle={{ zIndex: 1 }}>
-      {/* HeaderBar放在这里是因为没有在外面的页面就拿到userItem，这里需要name作为HeaderBar标题 */}
-      {!isMe ? (
-        <HeaderBar text={userItem.name + '的主页'} />
-      ) : (
-        <HeaderBar
-          showBack={false}
-          text={'我的主页'}
-          right={
-            <Icon
-              name="setting"
-              color="black"
-              style={{ fontSize: 26 }}
-              onPress={clickSetting}></Icon>
-          }
-        />
-      )}
+    <ScrollView
+      style={{ height: scrollViewHeight }}
+      contentContainerStyle={{ zIndex: 1 }}>
       {/* mock */}
       {true ? (
         // mock
@@ -71,12 +96,16 @@ export default function UserDetail({
           <Modal visible={isPreviewAvatar} transparent={true}>
             <ImageViewer
               onClick={() => setIsPreviewAvatar(false)}
+              saveToLocalByLongPress
+              menuContext={{
+                saveToLocal: '保存至手机',
+                cancel: '取消',
+              }}
               imageUrls={[
                 {
                   // url支持base64
                   url: userItem.avatarURL,
                   props: {
-                    saveToLocalByLongPress: true,
                     source: userItem.avatarURL
                       ? undefined
                       : require('../assets/img/avatar.png'),
@@ -126,15 +155,14 @@ export default function UserDetail({
                         : basic.womanIconColor,
                   }}></Icon>
               </View>
-              <DefaultText>
-                <Icon
-                  name="environment"
-                  size="xs"
-                  style={{ position: 'relative', top: 1 }}></Icon>
-                {userItem.currentAddress
-                  ?.filter(item => item !== '全部')
-                  .join('-')}
-              </DefaultText>
+              <View style={{ flexDirection: 'row' }}>
+                <Icon name="environment" size="xs"></Icon>
+                <DefaultText>
+                  {userItem.currentAddress
+                    ?.filter(item => item !== '全部')
+                    .join('-')}
+                </DefaultText>
+              </View>
             </View>
           </View>
           {isMe ? (
@@ -207,18 +235,24 @@ export default function UserDetail({
               ))}
             </View>
           )}
-          {/* <WhiteSpace size="md" />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {userItem.customTags?.map((item: string, index: number) => (
-              <View key={item}>
-                <Tag color={tagRgbaColor[index]} style={{ marginRight: 8 }}>
-                  {item}
-                </Tag>
-                <WhiteSpace size="md" />
-              </View>
-            ))}
-          </View>
-          <WhiteSpace size="md" /> */}
+
+          <WhiteSpace></WhiteSpace>
+          <DefaultText style={{ fontSize: 15 }}>
+            {isMe ? '我' : 'TA'}的动态
+          </DefaultText>
+          <WhiteSpace></WhiteSpace>
+          <WhiteSpace></WhiteSpace>
+          {isInit ? null : articleList.length ? (
+            articleList.map(item => (
+              <ArticleItem
+                key={item.articleId}
+                articleItemData={item}></ArticleItem>
+            ))
+          ) : (
+            <DefaultText style={{ fontSize: 15 }} isCenter>
+              暂无
+            </DefaultText>
+          )}
         </View>
       ) : (
         <Login />
