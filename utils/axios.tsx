@@ -4,7 +4,7 @@ import storage from './storage';
 import sleep from './sleep';
 import { setMyInfo, useMyInfo } from '../store/myInfo';
 import { Toast, Progress } from '@ant-design/react-native';
-import { setGlobalTip, getGlobalTip } from '../store/globalTip';
+// import { setGlobalTip, getGlobalTip } from '../store/globalTip';
 import ProgressTips from '../component/ProgressTips';
 import { View, Text, StyleSheet } from 'react-native';
 const axiosInstance = axios.create(axiosConfig);
@@ -30,7 +30,7 @@ let key: any = null;
 axiosInstance.interceptors.response.use(
   async function (response) {
     // 请求成功关闭回调框
-    Toast.remove(key);
+    // Toast.remove(key);
     key = null;
     // 2xx 范围内的状态码都会触发该函数。
     // 对响应数据做点什么
@@ -63,25 +63,25 @@ axiosInstance.interceptors.response.use(
     return response.data;
   },
   async function (err) {
-    if (!key) {
-      key = Toast.show({
-        content: '网络好像开小差了...',
-        icon: 'loading',
-        mask: true,
-        duration: 0,
-        // styles: {
-        //   container: {
-        //     margin: 'auto',
-        //     height: 200,
-        //     width: 200,
-        //     backgroundColor: 'gray'
-        //   },
-        //   innerWrap: {
-        //     backgroundColor: 'gray',
-        //   }
-        // },
-      });
-    }
+    // if (!key) {
+    //   key = Toast.show({
+    //     content: '网络好像开小差了...',
+    //     icon: 'loading',
+    //     mask: true,
+    //     duration: 0,
+    //     // styles: {
+    //     //   container: {
+    //     //     margin: 'auto',
+    //     //     height: 200,
+    //     //     width: 200,
+    //     //     backgroundColor: 'gray'
+    //     //   },
+    //     //   innerWrap: {
+    //     //     backgroundColor: 'gray',
+    //     //   }
+    //     // },
+    //   });
+    // }
     // setGlobalTip({
     //   ...getGlobalTip(),
     //   visible: true,

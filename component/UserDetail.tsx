@@ -64,15 +64,11 @@ export default function UserDetail({
     const helper = async () => {
       const res = await queryArticleList({ userId: userItem.id });
       const newUserArticleList = { ...userArticleList };
-      if (isMe) {
-        newUserArticleList.myArticleList = res.data;
-      } else {
-        newUserArticleList.othersArticleList = res.data;
-      }
+      newUserArticleList.othersArticleList = res.data;
       setUserArticleList(newUserArticleList);
       setIsInit(false);
     };
-    if (userItem.id) {
+    if (!isMe && userItem.id) {
       helper();
     } else {
       setIsInit(false);
