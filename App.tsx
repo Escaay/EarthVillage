@@ -13,6 +13,7 @@ import Home from './pages/home';
 import Filter from './pages/home/filter';
 import Others from './pages/home/others';
 import Login from './pages/me/login';
+import LikeList from './pages/chat/likeList/index.tsx';
 import basic from './config/basic';
 import Setting from './pages/me/setting';
 import Chat from './pages/chat';
@@ -20,7 +21,10 @@ import RouterGuard from './component/RouterGuard';
 import ChatDetail from './pages/chat/chatDetail/index.tsx';
 import CreateActivity from './pages/article/createArticle/index.tsx';
 import ArticleDetail from './pages/article/articleDetail/index.tsx';
-import Activity from './pages/article/index.tsx';
+import Activity from './pages/activity/index.tsx';
+import Article from './pages/article/index.tsx';
+import CommentList from './pages/chat/commentList/index.tsx';
+import UserList from './pages/chat/userList/index.tsx';
 import CreateArticle from './pages/article/createArticle/index.tsx';
 import ActivityDetail from './pages/activity/activityDetail/index.tsx';
 import ProgressTips from './component/ProgressTips.tsx';
@@ -32,8 +36,17 @@ import wsConnect from './utils/websocket.ts';
 import { queryChatList } from './api/user.ts';
 import { useChatList, setChatList } from './store/chatList.ts';
 import { queryMessagesByChatIds } from './api/user.ts';
+import { queryArticleUnReadCommentNum } from './api/article.ts';
 import { useMessagesList, setMessagesList } from './store/messagesList.ts';
 import websocketConfig from './config/websocket';
+import {
+  queryArticleList,
+  queryUnReadArticleLikeCount,
+} from './api/article.ts';
+import {
+  useUserArticleList,
+  setUserArticleList,
+} from './store/userArticleList.ts';
 // 地图选址模块，暂时不需要了
 // import ActivityLocation from './pages/article/createArticle/activityLocation/index.tsx';
 
@@ -46,7 +59,11 @@ const pushyClient = new Pushy({
   // 但即便打开此选项，也仅能检查、下载热更，并不能实际应用热更。实际应用热更必须在release包中进行。
   // debug: true
 });
-Toast.config({ duration: 0.5, mask: true });
+Toast.config({
+  duration: 0.5,
+  mask: true,
+  styles: { innerWrap: { backgroundColor: 'rgba(0,0,0,0.5)' } },
+});
 const RouterStack = createNativeStackNavigator();
 const RouterGuardWithOthers = () => (
   <RouterGuard>
@@ -83,78 +100,26 @@ const RouterGuardWithActivityDetail = () => (
     <ActivityDetail />
   </RouterGuard>
 );
+const RouterGuardWithLikeList = () => (
+  <RouterGuard>
+    <LikeList />
+  </RouterGuard>
+);
+const RouterGuardWithCommentList = () => (
+  <RouterGuard>
+    <CommentList />
+  </RouterGuard>
+);
+const RouterGuardWithUserList = () => (
+  <RouterGuard>
+    <UserList />
+  </RouterGuard>
+);
 // const RouterGuardWithActivityLocation = () => (
 //   <RouterGuard>
 //     <ActivityLocation />
 //   </RouterGuard>
 // );
-function HomeTabsRouter() {
-  const chatList = useChatList();
-  const totalUnReadCount = chatList?.reduce((pre, cur) => {
-    if (cur.unReadCount) {
-      return pre + cur.unReadCount;
-    } else {
-      return pre;
-    }
-  }, 0);
-  return (
-    <Tab.Navigator
-      initialRouteName="Activity"
-      screenOptions={({ route }) => ({
-        tabBarStyle: { height: basic.tabBarHeight },
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: any;
-
-          if (route.name === 'Home') {
-            iconName = 'reddit';
-          } else if (route.name === 'Me') {
-            iconName = 'aliwangwang';
-          } else if (route.name === 'Chat') {
-            iconName = 'message';
-          } else if (route.name === 'Activity') {
-            iconName = 'home';
-          } else if (route.name === 'Article') {
-            iconName = 'read';
-          }
-
-          return <Icon name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: 'tomato',
-        tabBarInactiveTintColor: 'gray',
-      })}>
-      <Tab.Screen
-        name="Home"
-        options={{ title: '搭子', headerShown: false }}
-        component={Home}
-      />
-      <Tab.Screen
-        name="Article"
-        options={{ title: '动态', headerShown: false }}
-        component={Activity}
-      />
-      <Tab.Screen
-        name="Activity"
-        options={{ title: '大厅', headerShown: false }}
-        component={Activity}
-      />
-      <Tab.Screen
-        name="Chat"
-        options={{
-          title: '消息',
-          headerShown: false,
-          tabBarBadge: totalUnReadCount ? totalUnReadCount : undefined,
-        }}
-        component={Chat}
-      />
-      <Tab.Screen
-        name="Me"
-        options={{ title: '我', headerShown: false }}
-        component={Me}
-      />
-      {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
-    </Tab.Navigator>
-  );
-}
 
 const Tab = createBottomTabNavigator();
 
@@ -164,7 +129,80 @@ export default function App() {
   const chatList = useChatList();
   const messagesList = useMessagesList();
   const websocketRef = useRef<any>();
+  const userArticleList = useUserArticleList();
   const userId = myInfo.id;
+
+  function HomeTabsRouter() {
+    const chatList = useChatList();
+    const totalUnReadCount =
+      chatList?.reduce((pre, cur) => {
+        if (cur.unReadCount) {
+          return pre + cur.unReadCount;
+        } else {
+          return pre;
+        }
+      }, 0) +
+      userArticleList?.unReadLikeCount +
+      userArticleList?.unReadCommentCount;
+    return (
+      <Tab.Navigator
+        initialRouteName="Activity"
+        screenOptions={({ route }) => ({
+          tabBarStyle: { height: basic.tabBarHeight },
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName: any;
+
+            if (route.name === 'Home') {
+              iconName = 'reddit';
+            } else if (route.name === 'Me') {
+              iconName = 'aliwangwang';
+            } else if (route.name === 'Chat') {
+              iconName = 'message';
+            } else if (route.name === 'Activity') {
+              iconName = 'home';
+            } else if (route.name === 'Article') {
+              iconName = 'read';
+            }
+
+            return <Icon name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: 'tomato',
+          tabBarInactiveTintColor: 'gray',
+        })}>
+        <Tab.Screen
+          name="Home"
+          options={{ title: '搭子', headerShown: false }}
+          component={Home}
+        />
+        <Tab.Screen
+          name="Article"
+          options={{ title: '动态', headerShown: false }}
+          component={Article}
+        />
+        <Tab.Screen
+          name="Activity"
+          options={{ title: '大厅', headerShown: false }}
+          component={Activity}
+        />
+        <Tab.Screen
+          name="Chat"
+          options={{
+            title: '消息',
+            headerShown: false,
+            tabBarBadge: totalUnReadCount ? totalUnReadCount : undefined,
+          }}
+          component={Chat}
+        />
+        <Tab.Screen
+          name="Me"
+          options={{ title: '我', headerShown: false }}
+          component={Me}
+        />
+        {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
+      </Tab.Navigator>
+    );
+  }
+
   // 这里相当于整个项目初始化的逻辑
   // 每次进应用看一下是否已有登录或者刷新token，更新登录信息
   useEffect(() => {
@@ -363,6 +401,8 @@ export default function App() {
           storage.setItem('refreshToken', '');
           setChatList([]);
           setMessagesList([]);
+          userArticleList.myArticleList = [];
+          setUserArticleList({ ...userArticleList });
         } else {
           // 刷新聊天列表和历史详情,存储到全局
           const newChatList = (await queryChatList({ userId: myInfo.id })).data;
@@ -385,6 +425,24 @@ export default function App() {
             item => (item.messages = item.messages.reverse()),
           );
           setMessagesList(newMessagesList);
+          const res = await queryArticleList({ userId: myInfo.id });
+          userArticleList.myArticleList = res.data;
+          const unReadCommentCount = (
+            await queryArticleUnReadCommentNum({ articleSenderId: myInfo.id })
+          ).data;
+          const unReadLikeCount = userArticleList.myArticleList.reduce(
+            (pre, cur) => {
+              return (
+                pre + cur.likeInfo.filter(item => item.isRead === false).length
+              );
+            },
+            0,
+          );
+          setUserArticleList({
+            ...userArticleList,
+            unReadLikeCount,
+            unReadCommentCount,
+          });
         }
       } catch (e) {
         console.log('e--', e);
@@ -453,6 +511,21 @@ export default function App() {
               options={{ headerShown: false }}
               name="CreateActivity"
               component={RouterGuardWithCreateActivity}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="CommentList"
+              component={RouterGuardWithCommentList}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="LikeList"
+              component={RouterGuardWithLikeList}
+            />
+            <RouterStack.Screen
+              options={{ headerShown: false }}
+              name="UserList"
+              component={RouterGuardWithUserList}
             />
             {/* <RouterStack.Screen
               options={{ headerShown: false }}
