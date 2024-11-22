@@ -120,3 +120,7 @@ console.dir()在生产环境会报错，不要用
 44. react-native-image-zoom-viewer外层的Modal要从react-native引入,不要从antd引入,不然无法显示图片
 
 45. articleDetail页面中，Input在scrollView下面，这种情况弹出键盘会自动抬升Input输入框高度，但是FLatList不会
+
+46. useUpdateEffect优化，可以让个人信息加载出来之后再拉取列表，顺便用setMyInfo({})骗react进行更新，触发一次useUpdateEffect，如果直接用useEffect会触发两次
+
+47. A组件里面使用到B组件的，不要在A组件中定义组件B,因为A刷新会导致A被重新定义，要放到A组件外面，不然可能会导致无限重新渲染
