@@ -1,5 +1,8 @@
 export default {
+  // host: 'ws://192.168.184.74:3002',
   host: __DEV__
-    ? '192.168.1.100:3000/api'
-    : 'ev-server-whfmnthsix.cn-hangzhou.fcapp.run/api',
+    ? 'ws://192.168.1.104:3002'
+    : 'wss://ev-websocket-ksdvmaxncm.cn-hangzhou.fcapp.run',
+  // host: 'wss://ev-websocket-ksdvmaxncm.cn-hangzhou.fcapp.run',
+  delay: 100,
 };
