@@ -207,7 +207,10 @@ const ArticleItem = (props: any) => {
     }
   };
 
-  const clickPeopleAvatar = peopleId => {};
+  const clickPeopleAvatar = async peopleId => {
+    const userItem = (await queryUserBasis({ id: peopleId })).data;
+    navigation.navigate('Others', { userItem });
+  };
 
   const clickJoinTeam = articleId => {};
 
@@ -327,6 +330,7 @@ const ArticleItem = (props: any) => {
             ) : null}
           </View>
           <WhiteSpace></WhiteSpace>
+          <WhiteSpace></WhiteSpace>
           {teamPeople ? (
             <View style={{ flexDirection: 'row' }}>
               {teamPeople.map(item => (
@@ -337,10 +341,10 @@ const ArticleItem = (props: any) => {
                   }>
                   <Image
                     style={{
-                      marginRight: 4,
-                      width: 30,
-                      height: 30,
-                      borderRadius: 15,
+                      marginRight: 6,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
                     }}
                     source={
                       item
@@ -355,16 +359,17 @@ const ArticleItem = (props: any) => {
               <Pressable onPress={() => clickJoinTeam(articleId)}>
                 <Image
                   style={{
-                    marginRight: 4,
-                    width: 30,
-                    height: 30,
-                    borderRadius: 15,
+                    marginRight: 6,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                   }}
                   source={require('../assets/img/joinTeam.png')}
                 />
               </Pressable>
             </View>
           ) : null}
+          <WhiteSpace></WhiteSpace>
           <WhiteSpace></WhiteSpace>
           <WhiteSpace></WhiteSpace>
           <DefaultText style={{ color: 'black', fontSize: 14 }}>
