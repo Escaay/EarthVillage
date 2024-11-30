@@ -86,14 +86,12 @@ export default function Article() {
         type: 'recommand',
         pageInfo: recommandArticleListPageInfo,
       });
-      console.log(res.data.length);
       if (res.data.length < PAGE_SIZE) setIsRecommandAtcsAllLoad(true);
       if (recommandArticleListPageInfo.pageNum === 1)
         setRecommandArticleList(res.data);
       if (recommandArticleListPageInfo.pageNum !== 1)
         setRecommandArticleList([...recommandArticleList, ...res.data]);
       setIsRecommandAtcsLoading(false);
-      // console.log(res)
     } catch (e) {
       console.log('queryArticleList---error', e);
     }
@@ -113,8 +111,6 @@ export default function Article() {
       if (sameCityArticleListPageInfo.pageNum !== 1)
         setSameCityArticleList([...sameCityArticleList, ...res.data]);
       setIsSameCityAtcsLoading(false);
-      console.log('setIsSameCityAtcsLoading');
-      // console.log(res)
     } catch (e) {
       console.log('queryArticleList---error', e);
     }
@@ -274,7 +270,6 @@ export default function Article() {
           onEndReached={() => {
             // 进来的时候会触发一次，需要避免不必要请求，判读是否初始化
             if (isSameCityAtcsAllLoad || isSameCityAtcsLoading) return;
-            console.log('loadmore');
             sameCityArticleListPageInfo.pageNum =
               sameCityArticleListPageInfo.pageNum + 1;
             setSameCityArticleListPageInfo({ ...sameCityArticleListPageInfo });
