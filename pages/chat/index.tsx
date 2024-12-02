@@ -17,24 +17,28 @@ import { FlatList } from 'react-native';
 import dayjs from 'dayjs';
 import basic from '../../config/basic';
 import Login from '../me/login';
+import { useUserArticleList } from '../../store/userArticleList';
 import HeaderBar from '../../component/HeaderBar';
 import { useChatList, setChatList } from '../../store/chatList';
-import useUpdateEffect from '../../utils/useUpdateEffect';
+import useUpdateEffect from '../../hook/useUpdateEffect';
+import { queryUnReadCommentNum, queryUnReadLikeNum } from '../../api/article';
+import { setUserArticleList } from '../../store/userArticleList';
 import { useNavigation } from '@react-navigation/native';
 import randomInteger from '../../utils/randomInteger';
 import { useMessagesList } from '../../store/messagesList';
 import DefaultText from '../../component/DefaultText';
-import { useUserId } from '../../store/userId';
+import { h } from 'vue';
+import { queryUnreadCount } from '../../api/article';
+import useScreenSize from '../../hook/useScreenSize';
+import { useUnreadCount, setUnreadCount } from '../../store/unreadCount';
 export default function Chat(props: any) {
   const navigation = useNavigation<any>();
   const myInfo = useMyInfo();
-  const isLogin = !!useUserId();
-  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const isLogin = !!myInfo.id;
+  const { screenHeight, screenWidth } = useScreenSize();
   const { StatusBarManager } = NativeModules;
-  const STATUS_BAR_HEIGHT =
-    Platform.OS === 'android'
-      ? StatusBar.currentHeight
-      : StatusBarManager.HEIGHT;
+  const unreadCount = useUnreadCount();
+  const userArticleList = useUserArticleList();
   const flatListMinHeight =
     screenHeight - basic.headerHeight - basic.tabBarHeight;
   const chatList = useChatList()?.sort(item => item.lastMessageTime);
@@ -50,6 +54,19 @@ export default function Chat(props: any) {
       ),
     );
   };
+
+  // const refreshUnReadNum = async () => {
+  //   const unreadCommentCount = (
+  //     await queryUnReadCommentNum({ userId: myInfo.id })
+  //   ).data;
+  //   const unreadLikeCount = (
+  //     await queryUnReadLikeNum({ userId: myInfo.id })
+  //   ).data;
+  //   setUnreadCount({
+  //     unreadLikeCount,
+  //     unreadCommentCount,
+  //   });
+  // }
 
   const displayTime = lastMessageTime => {
     const dwy = (dayjsTime: any): any => {
@@ -98,13 +115,35 @@ export default function Chat(props: any) {
     return formatTime(now, messageTime);
   };
 
+  const clickLike = () => {
+    navigation.navigate('LikeList');
+  };
+
+  const clickUser = () => {
+    navigation.navigate('UserList');
+  };
+
+  const clickComment = () => {
+    navigation.navigate('CommentList');
+  };
+
   const CHAR_ITEM_HEIGTH = 80;
   const ChatItem = ({ chatItemData }: { chatItemData: any }) => {
-    const { avatarURL: partnerAvatarURL, name: partnerName } =
-      chatItemData.partnerInfo;
+    const unReadCount = chatItemData.isSender
+      ? chatItemData.senderUnreadCount
+      : chatItemData.receiverUnreadCount;
+    const receiver = chatItemData.isSender
+      ? chatItemData.receiver
+      : chatItemData.sender;
+    const {
+      avatarURL: partnerAvatarURL,
+      name: partnerName,
+      id: partnerId,
+    } = receiver;
+    const isAssistant = partnerId === basic.assistantId;
     const clickChatItem = async () => {
       try {
-        navigation.navigate('ChatDetail', { chatItemData });
+        navigation.navigate('ChatDetail', { chatItemData, isAssistant });
       } catch (e) {}
     };
     const { lastMessage } = chatItemData;
@@ -114,15 +153,16 @@ export default function Chat(props: any) {
           flexDirection: 'row',
           height: CHAR_ITEM_HEIGTH,
           paddingVertical: 10,
+          paddingHorizontal: 4,
         }}
         onPress={() => clickChatItem()}>
         <View
           style={{ flex: 2, justifyContent: 'center', alignItems: 'center' }}>
           <Image
             style={{
-              width: 60,
-              height: 60,
-              borderRadius: 30,
+              width: 50,
+              height: 50,
+              borderRadius: 25,
             }}
             source={
               partnerAvatarURL
@@ -134,16 +174,38 @@ export default function Chat(props: any) {
           />
         </View>
         <View style={{ flex: 6, paddingHorizontal: 5 }}>
-          <DefaultText
-            style={{
-              color: 'black',
-              fontWeight: 800,
-              marginBottom: 10,
-              fontSize: 14,
-            }}>
-            {partnerName}
-          </DefaultText>
-          <DefaultText style={{ color: 'gray', fontSize: 12 }}>
+          <View style={{ flexDirection: 'row' }}>
+            <DefaultText
+              style={{
+                color: 'black',
+                fontWeight: 500,
+                marginBottom: 10,
+                marginTop: 5,
+                fontSize: 14,
+              }}>
+              {partnerName}
+            </DefaultText>
+            {isAssistant ? (
+              <DefaultText
+                style={{
+                  marginLeft: 6,
+                  padding: 3,
+                  color: 'white',
+                  textAlignVertical: 'center',
+                  textAlign: 'center',
+                  backgroundColor: basic.themeColor,
+                  fontWeight: 600,
+                  marginBottom: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: 'black',
+                  fontSize: 9,
+                }}>
+                官方
+              </DefaultText>
+            ) : null}
+          </View>
+          <DefaultText style={{ color: 'gray', fontSize: 11 }}>
             {lastMessage
               ? lastMessage.length > 10
                 ? lastMessage.slice(0, 10) + '...'
@@ -165,7 +227,7 @@ export default function Chat(props: any) {
               ? displayTime(chatItemData.lastMessageTime)
               : '新聊天'}
           </DefaultText>
-          {chatItemData.unReadCount ? (
+          {unReadCount ? (
             <DefaultText
               style={{
                 backgroundColor: 'red',
@@ -176,11 +238,130 @@ export default function Chat(props: any) {
                 textAlignVertical: 'center',
                 color: 'white',
               }}>
-              {chatItemData.unReadCount}
+              {unReadCount}
             </DefaultText>
           ) : null}
         </View>
       </Pressable>
+    );
+  };
+
+  const ListHeaderComponent = () => {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          marginTop: 6,
+        }}>
+        <Pressable onPress={clickLike}>
+          <View
+            style={{
+              backgroundColor: 'rgba(244, 66, 53, 0.3)',
+              width: 60,
+              height: 60,
+              borderRadius: 20,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Image
+              style={{ width: 30, height: 30 }}
+              source={require('../../assets/img/like-fill.png')}></Image>
+            {unreadCount.unreadLikeCount ? (
+              <DefaultText
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: 'red',
+                  color: 'white',
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                }}
+                isCenter>
+                {unreadCount.unreadLikeCount}
+              </DefaultText>
+            ) : null}
+          </View>
+          <DefaultText style={{ color: 'black', marginVertical: 6 }} isCenter>
+            点赞
+          </DefaultText>
+        </Pressable>
+
+        <Pressable onPress={clickUser}>
+          <View
+            style={{
+              backgroundColor: 'rgba(20, 150, 219, 0.3)',
+              width: 60,
+              height: 60,
+              borderRadius: 20,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Image
+              style={{ width: 32, height: 32 }}
+              source={require('../../assets/img/user.png')}></Image>
+            {unreadCount?.unreadTeamApplicationCount ? (
+              <DefaultText
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: 'red',
+                  color: 'white',
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                }}
+                isCenter>
+                {unreadCount.unreadTeamApplicationCount}
+              </DefaultText>
+            ) : null}
+          </View>
+          <DefaultText style={{ color: 'black', marginVertical: 6 }} isCenter>
+            组队
+          </DefaultText>
+        </Pressable>
+
+        <Pressable onPress={clickComment}>
+          <View
+            style={{
+              backgroundColor: 'rgba(110, 228, 70, 0.3)',
+              width: 60,
+              height: 60,
+              borderRadius: 20,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+            <Image
+              style={{ width: 28, height: 28 }}
+              source={require('../../assets/img/comment.png')}></Image>
+            {userArticleList.unreadCommentCount ? (
+              <DefaultText
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: 'red',
+                  color: 'white',
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                }}
+                isCenter>
+                {userArticleList.unreadCommentCount}
+              </DefaultText>
+            ) : null}
+          </View>
+          <DefaultText
+            style={{ color: 'black', marginTop: 6, marginBottom: 14 }}
+            isCenter>
+            评论
+          </DefaultText>
+        </Pressable>
+      </View>
     );
   };
 
@@ -190,8 +371,12 @@ export default function Chat(props: any) {
         <>
           <HeaderBar text="消息" showBack={false}></HeaderBar>
           <FlatList
+            ListHeaderComponent={ListHeaderComponent}
             ref={chatListRef}
-            contentContainerStyle={{ minHeight: flatListMinHeight }}
+            contentContainerStyle={{
+              backgroundColor: 'white',
+              minHeight: flatListMinHeight,
+            }}
             ListEmptyComponent={
               <DefaultText
                 style={{
@@ -204,6 +389,24 @@ export default function Chat(props: any) {
             }
             refreshing={false}
             onRefresh={async () => {
+              const unreadCount = (
+                await queryUnreadCount({ userId: myInfo.id })
+              ).data;
+              const {
+                articleCommentUnreadCount,
+                teamApplicationUnreadCount,
+                articleUnreadLikeCount,
+                articleCommentUnreadLikeCount,
+                messageListUnreadCount,
+              } = unreadCount;
+              console.log(unreadCount);
+              setUnreadCount({
+                unreadLikeCount:
+                  articleUnreadLikeCount + articleCommentUnreadLikeCount,
+                unreadCommentCount: articleCommentUnreadCount,
+                unreadTeamApplicationCount: teamApplicationUnreadCount,
+                unreadMessageCount: messageListUnreadCount,
+              });
               await refreshChatList();
             }}
             style={{

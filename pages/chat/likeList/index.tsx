@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useRoute } from '@react-navigation/native';
 import { useMyInfo } from '../../../store/myInfo';
 import {
-  queryUnReadArticleLikeList,
+  queryArticleItem,
+  queryLikeList,
   updateArticle,
   updateArticleComment,
 } from '../../../api/article';
@@ -19,6 +20,7 @@ import {
   Platform,
   StatusBar,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { FlatList } from 'react-native';
 import dayjs from 'dayjs';
@@ -38,111 +40,66 @@ import {
 import useScreenSize from '../../../hook/useScreenSize';
 import { Toast, Icon, WhiteSpace } from '@ant-design/react-native';
 import { queryUserBasis } from '../../../api/user';
+import { setUnreadCount, useUnreadCount } from '../../../store/unreadCount';
 export default function LikeList(props: any) {
   const navigation = useNavigation<any>();
   const myInfo = useMyInfo();
   const isLogin = !!myInfo.id;
   const userArticleList = useUserArticleList();
   const { myArticleList } = userArticleList;
+  const unreadCount = useUnreadCount();
   const { screenHeight, screenWidth } = useScreenSize();
   const route = useRoute<any>();
-  const [isLoading, setIsLoading] = useState(true);
   const flatListMinHeight = screenHeight - basic.headerHeight;
   const likeListRef = useRef<any>();
-  const [articleLikeList, setArticleLikeList] = useState([]);
+  const [isInit, setIsInit] = useState(true);
+  const [likeList, setLikeList] = useState([]);
   useEffect(() => {
-    refreshArticleLikeList();
+    const helper = async () => {
+      await refreshlikeList();
+      setIsInit(false);
+    };
+    helper();
   }, []);
 
-  const refreshArticleLikeList = async () => {
+  const refreshlikeList = async () => {
     try {
-      setIsLoading(true);
-
-      // 如果文章列表为空，可能是还没有加载过（也可能加载了但是为空，如果不为空一定是加载过）
-      if (!myArticleList.length) {
-        const res = await queryArticleList({ userId: myInfo.id });
-        const newUserArticleList = { ...userArticleList };
-        newUserArticleList.myArticleList = res.data;
-        setUserArticleList(newUserArticleList);
-      }
-      // todo
-      const newArticleLikeList = [];
-      const userIds: string[] = [];
-      myArticleList.forEach(article => {
-        article.likeInfo.forEach(like => {
-          if (like.isRead === false) {
-            newArticleLikeList.push({
-              article,
-              likeInfo: like,
-            });
-            userIds.push(like.userId);
-          }
-        });
-      });
-
-      const userInfoList = (
-        await queryUserBasis({
-          findMany: true,
-          ids: userIds,
-          selectFields: {
-            id: true,
-            avatarURL: true,
-            name: true,
-            age: true,
-            currentAddress: true,
-            gender: true,
-          },
-        })
-      ).data;
-      newArticleLikeList.forEach(item => {
-        const completeUserInfo = userInfoList.find(
-          item1 => item1.id === item.likeInfo.userId,
-        );
-        item.likeInfo.likerAvatarURL = completeUserInfo.avatarURL;
-        item.likeInfo.likerName = completeUserInfo.name;
-        item.likeInfo.likerAge = completeUserInfo.age;
-        item.likeInfo.likerCurrentAddress = completeUserInfo.currentAddress;
-        item.likeInfo.likerGender = completeUserInfo.gender;
-      });
-      setArticleLikeList(newArticleLikeList);
-      setIsLoading(false);
+      // 拿最新的
+      const res = await queryLikeList({ userId: myInfo.id });
+      const newLikeList = [
+        ...res.data.articleLikeList,
+        ...res.data.articleCommentLikeList,
+      ];
+      setLikeList(newLikeList);
 
       // 把用户文章的点赞信息全部设为已读
-      const noRepeatNewArticleIdList = new Set();
-      myArticleList.forEach(item =>
-        item.likeInfo.forEach(like => (like.isRead = true)),
-      );
-      setUserArticleList({ ...userArticleList, unReadLikeCount: 0 });
-      newArticleLikeList.forEach(item => {
-        // 避免重复请求，多个点赞对应同一文章的，只请求一次
-        if (noRepeatNewArticleIdList.has(item.article.articleId)) return;
-        updateArticle({
-          articleId: item.article.articleId,
-          likeInfo: item.article.likeInfo.map(item => ({
-            ...item,
-            isRead: true,
-          })),
-        });
-        noRepeatNewArticleIdList.add(item.article.articleId);
-      });
+      // const noRepeatNewArticleIdList = new Set();
+      // myArticleList.forEach(item =>
+      //   item.likeInfo.forEach(like => (like.isRead = true)),
+      // );
+      setUnreadCount({ ...unreadCount, unreadLikeCount: 0 });
     } catch (e) {
       console.log(e);
     }
   };
 
-  const ArticleLikeItem = (props: any) => {
+  const LikeItem = (props: any) => {
     const CONTENT_PADDING_LEFT = 40 + 6; // 头像宽度+右margin
     const { articleLikeItemData } = props;
-    const { article, likeInfo } = articleLikeItemData;
-    const { textContent } = article;
     const {
-      likerAge,
-      likerAvatarURL,
-      likerCurrentAddress,
-      likerGender,
-      likerName,
+      articleLikeId,
+      article,
+      sender,
+      // 有这个说明是文章点赞
+      articleSenderId,
+      // 有这个说明是文章评论点赞
+      commentSenderId,
+      isRead,
       createTime,
-    } = likeInfo;
+      articleComment,
+      updateTime,
+    } = articleLikeItemData;
+    const { textContent } = articleComment ? articleComment : article;
     const clickAvatar = async (userId: string) => {
       if (!isLogin) {
         navigation.navigate('Login');
@@ -157,7 +114,7 @@ export default function LikeList(props: any) {
     return (
       <>
         <Pressable
-          onPress={() => clickAvatar(likeInfo.userId)}
+          onPress={() => clickAvatar(sender.id)}
           style={{ flexDirection: 'row', marginBottom: 15 }}>
           <Image
             style={{
@@ -167,9 +124,9 @@ export default function LikeList(props: any) {
               borderRadius: 20,
             }}
             source={
-              likerAvatarURL
+              sender.avatarURL
                 ? {
-                    uri: likerAvatarURL,
+                    uri: sender.avatarURL,
                   }
                 : require('../../../assets/img/avatar.png')
             }
@@ -187,20 +144,20 @@ export default function LikeList(props: any) {
                   fontWeight: 800,
                 }}
                 isCenter={true}>
-                {likerName}
+                {sender.name}
               </DefaultText>
               <DefaultText
                 style={{ fontSize: 12, marginRight: 2, color: 'black' }}
                 isCenter={true}>
-                {likerAge}
+                {sender.age}
               </DefaultText>
               <Icon
-                name={likerGender === '男' ? 'man' : 'woman'}
+                name={sender.gender === '男' ? 'man' : 'woman'}
                 style={{
                   textAlignVertical: 'center',
                   fontSize: 14,
                   color:
-                    likerGender === '男'
+                    sender.gender === '男'
                       ? basic.manIconColor
                       : basic.womanIconColor,
                 }}></Icon>
@@ -211,14 +168,25 @@ export default function LikeList(props: any) {
                 size="xxs"
                 style={{ position: 'relative', top: 1, fontSize: 14 }}></Icon>
               <DefaultText style={{ fontSize: 10 }} isCenter={true}>
-                {likerCurrentAddress?.filter(item => item !== '全部').join('-')}
+                {sender.currentAddress
+                  ?.filter(item => item !== '全部')
+                  .join('-')}
               </DefaultText>
             </View>
           </View>
         </Pressable>
-        <View style={{ paddingLeft: CONTENT_PADDING_LEFT }}>
+        <Pressable
+          style={{ paddingLeft: CONTENT_PADDING_LEFT }}
+          onPress={async () => {
+            const res = await queryArticleItem({
+              articleId: article.articleId,
+            });
+            navigation.navigate('ArticleDetail', {
+              articleItemData: res.data,
+            });
+          }}>
           <DefaultText style={{ color: 'black', fontSize: 14 }}>
-            点赞了你的动态
+            点赞了你的{commentSenderId ? '评论' : '动态'}
           </DefaultText>
           <WhiteSpace></WhiteSpace>
           <WhiteSpace></WhiteSpace>
@@ -232,7 +200,7 @@ export default function LikeList(props: any) {
               {publishDisplayTime(createTime)}
             </DefaultText>
           </View>
-        </View>
+        </Pressable>
         <WhiteSpace></WhiteSpace>
       </>
     );
@@ -249,7 +217,15 @@ export default function LikeList(props: any) {
           backgroundColor: 'white',
         }}
         ListEmptyComponent={
-          isLoading ? null : (
+          isInit ? (
+            <View
+              style={{
+                paddingTop: flatListMinHeight * 0.45,
+                alignItems: 'center',
+              }}>
+              <ActivityIndicator color="gray" size={30}></ActivityIndicator>
+            </View>
+          ) : (
             <DefaultText
               style={{
                 textAlign: 'center',
@@ -262,16 +238,22 @@ export default function LikeList(props: any) {
         }
         refreshing={false}
         onRefresh={async () => {
-          await refreshArticleLikeList();
+          await refreshlikeList();
+        }}
+        onEndReached={() => {
+          // 进来的时候会触发一次，需要避免不必要请求，判读是否初始化
+          if (isInit) return;
         }}
         style={{
           height: flatListMinHeight,
         }}
-        data={articleLikeList}
-        renderItem={({ item }) => (
-          <ArticleLikeItem articleLikeItemData={item} />
-        )}
-        keyExtractor={(item: any) => item.chatId}
+        data={likeList}
+        renderItem={({ item }) => <LikeItem articleLikeItemData={item} />}
+        keyExtractor={(item: any) =>
+          item.article.articleId +
+          (item.articleSenderId ?? 'comment') +
+          (item.commentSenderId ?? 'article')
+        }
       />
     </>
   );

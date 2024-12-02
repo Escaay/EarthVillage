@@ -24,6 +24,7 @@ import { Icon } from '@ant-design/react-native';
 import BasicButton from '../../../component/BasicButton';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import basic from '../../../config/basic';
+import { useUnreadCount } from '../../../store/unreadCount';
 import { uploadImage } from '../../../utils/imageUpload';
 import dayjs from 'dayjs';
 import { setMessagesList, useMessagesList } from '../../../store/messagesList';
@@ -44,11 +45,13 @@ import useUpdateEffect from '../../../hook/useUpdateEffect';
 import { useNavigation } from '@react-navigation/native';
 import Animated from 'react-native-reanimated';
 import babelConfig from '../../../babel.config';
+import { setUnreadCount } from '../../../store/unreadCount';
 
 const isPicture = (value: string) => {
   return value?.startsWith('data:image/png;base64') && value.length > 1000;
 };
 export default function ChatDetail(props: any) {
+  const unreadCount = useUnreadCount();
   const navigation = useNavigation<any>();
   const { StatusBarManager } = NativeModules;
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
@@ -86,7 +89,10 @@ export default function ChatDetail(props: any) {
   const messagesList = useMessagesList();
   const { chatItemData, isAssistant } = route.params;
   const [isPreviewImage, setIsPreviewImage] = useState(false);
-  const { chatId, receiver } = chatItemData;
+  const { chatId } = chatItemData;
+  const receiver = chatItemData.isSender
+    ? chatItemData.receiver
+    : chatItemData.sender;
   const {
     avatarURL: partnerAvatarURL,
     name: partnerName,
@@ -119,15 +125,34 @@ export default function ChatDetail(props: any) {
 
   const clearUnReadCount = async () => {
     try {
-      if (chatItemData.unreadCount) {
-        chatItemData.unreadCount = 0;
-        const newChatList = [...chatList];
-        await updateChatList({
-          userId: myInfo.id,
-          chatList: newChatList,
+      const realChatItem = chatList.find(
+        item => item.chatId === chatItemData.chatId,
+      );
+      if (chatItemData.isSender) {
+        setUnreadCount({
+          ...unreadCount,
+          unreadMessageCount:
+            unreadCount?.unreadMessageCount - realChatItem.senderUnreadCount,
         });
-        setChatList(newChatList);
+        realChatItem.senderUnreadCount = 0;
+        await updateChatList({
+          chatId,
+          senderUnreadCount: 0,
+        });
+      } else {
+        setUnreadCount({
+          ...unreadCount,
+          unreadMessageCount:
+            unreadCount?.unreadMessageCount - realChatItem.receiverUnreadCount,
+        });
+        realChatItem.receiverUnreadCount = 0;
+        await updateChatList({
+          chatId,
+          receiverUnreadCount: 0,
+        });
       }
+      // chatItemData已经被序列化了，不是原来的值
+      setChatList([...chatList]);
     } catch (e) {
       console.log(e);
     }
@@ -245,6 +270,28 @@ export default function ChatDetail(props: any) {
     };
     try {
       const lastMessage = isPicture(value) ? '【图片】' : value;
+      // 数据库创建消息
+      const createMessagePayload: any = { ...newMessage };
+      createMessagePayload.sender = {
+        connect: {
+          id: createMessagePayload.senderId,
+        },
+      };
+      createMessagePayload.receiver = {
+        connect: {
+          id: createMessagePayload.receiverId,
+        },
+      };
+      createMessagePayload.chat = {
+        connect: {
+          chatId: createMessagePayload.chatId,
+        },
+      };
+      delete createMessagePayload.chatId;
+      delete createMessagePayload.senderId;
+      delete createMessagePayload.receiverId;
+      await createMessage(createMessagePayload);
+
       if (!chatItemData.lastMessage) {
         chatItemData.lastMessage = value;
         setMessagesList([
@@ -254,23 +301,46 @@ export default function ChatDetail(props: any) {
             messages: [newMessage],
           },
         ]);
-
-        const payload = { ...chatItemData };
-        delete payload.receiverId;
-        delete payload.senderId;
-        payload.receiver = {
+        const createChatPayload = { ...chatItemData };
+        delete createChatPayload.receiverId;
+        delete createChatPayload.senderId;
+        delete createChatPayload.isSender;
+        createChatPayload.receiver = {
           connect: {
             id: chatItemData.receiverId,
           },
         };
-        payload.sender = {
+        createChatPayload.sender = {
           connect: {
             id: chatItemData.senderId,
           },
         };
         const newChatList = [chatItemData, ...chatList];
+        await createChat(createChatPayload);
         setChatList(newChatList);
-        await createChat(payload);
+        // 对方需要创建的chatItem数据
+        const newReceiverChatItem = { ...chatItemData };
+        newReceiverChatItem.sender = {
+          id: myInfo.id,
+          name: myInfo.name,
+          avatarURL: myInfo.avatarURL,
+        };
+        newReceiverChatItem.receiverUnreadCount = 1;
+        // 对方的isSender是我方的相反
+        newReceiverChatItem.isSender = !newReceiverChatItem.isSender;
+        websocket?.send(
+          JSON.stringify({
+            type: 'sendMessage',
+            data: {
+              newMessage,
+              // 我方isSender
+              isSender: chatItemData.isSender,
+              senderUnreadCount: chatItemData.senderUnreadCount,
+              receiverUnreadCount: chatItemData.receiverUnreadCount,
+              newChatItem: newReceiverChatItem,
+            },
+          }),
+        );
       } else {
         const oldMessages = messagesList.find(item => item.chatId === chatId);
         // 多一个判断因为类型问题，其实oldMessages一定有的
@@ -288,49 +358,21 @@ export default function ChatDetail(props: any) {
           chatItemData,
           ...chatList?.filter(item => item.chatId !== chatItemData.chatId),
         ];
-        // const updateChatListPayload: any = {
-        //   chatId,
-        //   lastMessage,
-        //   lastMessageTime: messageCreateTime,
-        // };
-        // chatItemData.isSender
-        //   ? (updateChatListPayload.receiverUnreadCount =
-        //       chatItemData.receiverUnreadCount + 1)
-        //   : (updateChatListPayload.senderUnreadCount =
-        //       chatItemData.senderUnreadCount + 1);
-        // await updateChatList(updateChatListPayload);
         setChatList(newChatList);
+        // 给websocket发消息，通知另外一个人
+        websocket?.send(
+          JSON.stringify({
+            type: 'sendMessage',
+            data: {
+              newMessage,
+              isSender: chatItemData.isSender,
+              senderUnreadCount: chatItemData.senderUnreadCount,
+              receiverUnreadCount: chatItemData.receiverUnreadCount,
+              newChatItem: undefined,
+            },
+          }),
+        );
       }
-
-      const createMessagePayload: any = { ...newMessage };
-      createMessagePayload.sender = {
-        connect: {
-          id: createMessagePayload.senderId,
-        },
-      };
-      createMessagePayload.receiver = {
-        connect: {
-          receiverId: createMessagePayload.receiverId,
-        },
-      };
-      createMessagePayload.chat = {
-        connect: {
-          chatId: createMessagePayload.chatId,
-        },
-      };
-      await createMessage(newMessage);
-      // 给websocket发消息，通知另外一个人
-      websocket?.send(
-        JSON.stringify({
-          type: 'sendMessage',
-          data: {
-            newMessage,
-            isSender: chatItemData.isSender,
-            senderUnreadCount: chatItemData.senderUnreadCount,
-            receiverUnreadCount: chatItemData.receiverUnreadCount,
-          },
-        }),
-      );
       setContentValue('');
       // 后续发送消息滚到底部需要动画
       setTimeout(() => {
@@ -367,7 +409,7 @@ export default function ChatDetail(props: any) {
   // 当这个函数在检测时间内没再触发，那就滚动到对应位置
   const onFlatListContentSizeChange = (width: number, height: number) => {
     setFlatListContainerHeight(height);
-    console.log(height);
+    console.log('onFlatListContentSizeChange');
     switch (currentState.current) {
       // case 'sendMessage':
       //   // 普通发消息的逻辑，因为只有一条消息，会马上加载好，可以直接固定检测时间
@@ -376,16 +418,16 @@ export default function ChatDetail(props: any) {
       //   }, 200);
       //   break;
       case 'firstRender':
-        if (!toastKey.current) {
-          toastKey.current = Toast.loading({
-            content: <></>,
-          });
-        }
+        // if (!toastKey.current) {
+        //   toastKey.current = Toast.loading({
+        //     content: <></>,
+        //   });
+        // }
         clearTimeout(timer.current);
         timer.current = null;
         timer.current = setTimeout(() => {
           flatListRef?.current?.scrollToEnd({ animated: false });
-          Toast.remove(toastKey.current);
+          // Toast.remove(toastKey.current);
           toastKey.current = null;
         }, messages?.length * 20);
         break;
@@ -415,7 +457,10 @@ export default function ChatDetail(props: any) {
           flatListRef?.current?.scrollToEnd({ animated: true });
         }, 200);
     }
-    currentState.current = '';
+    // loadHistoryMessages会让高度变化两次，所以需要延时
+    setTimeout(() => {
+      currentState.current = '';
+    }, 100);
   };
 
   const avatarSource = (isMySend: boolean) => {
