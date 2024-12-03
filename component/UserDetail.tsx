@@ -272,9 +272,9 @@ export default function UserDetail({
                   flexDirection: 'row',
                   justifyContent: 'space-around',
                 }}>
-                <BasicButton backgroundColor="pink" wingBlank={40}>
+                {/* <BasicButton backgroundColor="pink" wingBlank={40}>
                   交换微信
-                </BasicButton>
+                </BasicButton> */}
                 <BasicButton
                   backgroundColor="orange"
                   wingBlank={40}
