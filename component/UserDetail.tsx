@@ -86,18 +86,25 @@ export default function UserDetail({
         type: 'userSelf',
         pageInfo: articleListPageInfo,
       });
+      const { articleList: newArticleList, articleListCount } = res.data;
       const newUserArticleList = { ...userArticleList };
       if (res.data.length < PAGE_SIZE) setIsArticleListAllLoad(true);
       if (isMe) {
         if (articleListPageInfo.pageNum === 1)
-          newUserArticleList.myArticleList = res.data;
+          newUserArticleList.myArticleList = newArticleList;
         if (articleListPageInfo.pageNum !== 1)
-          newUserArticleList.myArticleList = [...articleList, ...res.data];
+          newUserArticleList.myArticleList = [
+            ...articleList,
+            ...newArticleList,
+          ];
       } else {
         if (articleListPageInfo.pageNum === 1)
-          newUserArticleList.othersArticleList = res.data;
+          newUserArticleList.othersArticleList = newArticleList;
         if (articleListPageInfo.pageNum !== 1)
-          newUserArticleList.othersArticleList = [...articleList, ...res.data];
+          newUserArticleList.othersArticleList = [
+            ...articleList,
+            ...newArticleList,
+          ];
       }
       setUserArticleList(newUserArticleList);
       setIsLoading(false);
