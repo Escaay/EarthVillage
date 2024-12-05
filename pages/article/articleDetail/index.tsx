@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useMyInfo } from '../../../store/myInfo';
 import Login from '../../me/login';
 import { ActivityIndicator, Modal } from 'react-native';
@@ -49,12 +49,21 @@ export default function ArticleDetail() {
   const navigation = useNavigation<any>();
   const [contentValue, setContentValue] = useState('');
   const websocket = useWebsocket();
+  const [textAreaPlaceHolder, setTextAreaPlaceHolder] = useState('');
   const [keyBoardHeight, setKeyboardHeight] = useState(0);
   const { screenHeight, screenWidth } = useScreenSize();
   const [commentList, setCommentList] = useState<any>([]);
+  const [firstLevelArticleCommentCount, setFirstLevelArticleCommentCount] =
+    useState(1000000);
   const [isPreviewImage, setIsPreviewImage] = useState(false);
   const [imageURL, setImageURL] = useState('');
-  const [isInit, setIsInit] = useState(true);
+  const isUploadingImage = useRef(false);
+  const replyLevel2ArticlCommentId = useRef('');
+  const commentLevel = useRef<any>(1);
+  const replyCommentSenderName = useRef<any>('');
+  const textAreaRef = useRef(null);
+  const replyArticleCommentId = useRef('');
+  const [isLoading, setIsLoading] = useState(true);
   const recommandArticleList = useRecommandArticleList();
   const [commentListPageInfo, setCommentListPageInfo] = useState({
     pageNum: 1,
@@ -77,7 +86,6 @@ export default function ArticleDetail() {
     viewNum,
     imageUrlList,
     createTime,
-    updateTime,
   } = articleItemData;
 
   const clickAvatar = async (userId: string) => {
@@ -92,6 +100,31 @@ export default function ArticleDetail() {
     });
   };
 
+  useEffect(() => {
+    console.log(textAreaPlaceHolder);
+  }, [textAreaPlaceHolder]);
+
+  const clickComment = (
+    commentSenderName: string,
+    level: number,
+    commentId: string,
+    replyCommentId = '',
+  ) => {
+    try {
+      textAreaRef.current?.blur();
+      textAreaRef.current?.focus();
+      // console.log(`回复"${commentSenderName}":`)
+      setTextAreaPlaceHolder(`回复"${commentSenderName}":`);
+      // 1变2， 2变3，回复评论
+      commentLevel.current = level === 3 ? 3 : level + 1;
+      replyLevel2ArticlCommentId.current = replyCommentId;
+      replyArticleCommentId.current = commentId;
+      replyCommentSenderName.current = commentSenderName;
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
   const clickSend = async (value: string = contentValue) => {
     if (value === undefined || value === '') {
       Toast.info('内容为空');
@@ -102,33 +135,96 @@ export default function ArticleDetail() {
     const commentUpdateTime = new Date();
     const newComment: any = {
       articleCommentId,
-      articleId,
-      articleSenderId: senderId,
-      level: 1,
-      articleTextContent: textContent,
+      // articleId,
+      // articleSenderId: senderId,
+      level: commentLevel.current,
       textContent: value,
-      senderId: myInfo.id,
-      senderAge: myInfo.age,
-      senderAvatarURL: myInfo.avatarURL,
-      senderCurrentAddress: myInfo.currentAddress,
-      senderName: myInfo.name,
-      senderGender: myInfo.gender,
+      sender: {
+        id: myInfo.id,
+        age: myInfo.age,
+        name: myInfo.name,
+        gender: myInfo.gender,
+        avatarURL: myInfo.avatarURL,
+        currentAddress: myInfo.currentAddress,
+      },
+      article: {
+        articleId,
+        sender,
+      },
+      articleCommentLike: [],
       createTime: commentCreateTime,
       updateTime: commentUpdateTime,
     };
-    if (imageURL) newComment.imageURL = imageURL;
     try {
       Toast.loading({
         duration: 0,
         content: <></>,
       });
-      await createArticleComment(newComment);
+      const createArticleCommentPayload: any = {
+        articleCommentId,
+        articleSenderId: articleItemData.sender.id,
+        level: commentLevel.current,
+        textContent: value,
+        sender: {
+          connect: {
+            id: myInfo.id,
+          },
+        },
+        article: {
+          connect: {
+            articleId,
+          },
+        },
+        isRead: false,
+        createTime: commentCreateTime,
+        updateTime: commentUpdateTime,
+      };
+      if (replyArticleCommentId.current && commentLevel.current !== 1) {
+        newComment.replyArticleCommentId = replyArticleCommentId.current;
+        createArticleCommentPayload.replyArticleCommentId =
+          replyArticleCommentId.current;
+      }
+      if (replyLevel2ArticlCommentId.current && commentLevel.current === 3) {
+        newComment.replyLevel2ArticlCommentId =
+          replyLevel2ArticlCommentId.current;
+        newComment.replyCommentSenderName = replyCommentSenderName.current;
+        createArticleCommentPayload.replyLevel2ArticlCommentId =
+          replyLevel2ArticlCommentId.current;
+      }
+      if (imageURL) {
+        newComment.imageURL = imageURL;
+        createArticleCommentPayload.imageURL = imageURL;
+      }
+      await createArticleComment(createArticleCommentPayload);
       Toast.info('评论已发布');
       Toast.removeAll();
       setContentValue('');
       setImageURL('');
       Keyboard.dismiss();
-      setCommentList([{ ...newComment, likeInfo: [] }, ...commentList]);
+      if (newComment.level === 1) {
+        setCommentList([newComment, ...commentList]);
+      }
+      if (newComment.level === 2) {
+        const matchCommentItem = commentList.find(
+          item => item.articleCommentId === replyArticleCommentId.current,
+        );
+        matchCommentItem.replyComment = [
+          newComment,
+          ...matchCommentItem.replyComment,
+        ];
+        setCommentList([...commentList]);
+      }
+
+      if (newComment.level === 3) {
+        const matchCommentItem = commentList.find(
+          item => item.articleCommentId === replyArticleCommentId.current,
+        );
+        matchCommentItem.replyComment = [
+          newComment,
+          ...matchCommentItem.replyComment,
+        ];
+        setCommentList([...commentList]);
+      }
       const matchRecommandArticleItem = recommandArticleList?.find(
         item => item.articleId === articleId,
       );
@@ -148,12 +244,17 @@ export default function ArticleDetail() {
       }
       navigation.setParams({ ...articleItemData });
       // 给websocket发消息，如果被留言者在线，那么用官方助手通知他
-      websocket?.send(
-        JSON.stringify({
-          type: 'sendComment',
-          data: { receiverId: newComment.articleSenderId },
-        }),
-      );
+      const receiverId = newComment.article.sender.id;
+      console.log(receiverId, myInfo.id);
+      if (receiverId !== myInfo.id) {
+        websocket?.send(
+          JSON.stringify({
+            type: 'sendComment',
+            data: { receiverId },
+          }),
+        );
+      }
+
       await updateArticle({
         articleId,
         commentNum: articleItemData.commentNum,
@@ -164,11 +265,16 @@ export default function ArticleDetail() {
   };
 
   const loadCommentList = async () => {
+    setIsLoading(true);
     const res = await queryArticleCommentList({
       articleId: articleItemData.articleId,
       pageInfo: commentListPageInfo,
     });
-    setCommentList(res.data);
+    const { firstLevelArticleCommentList, firstLevelArticleCommentCount } =
+      res.data;
+    setCommentList([...commentList, ...firstLevelArticleCommentList]);
+    setFirstLevelArticleCommentCount(firstLevelArticleCommentCount);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -176,7 +282,7 @@ export default function ArticleDetail() {
     const helper = async () => {
       try {
         await loadCommentList();
-        setIsInit(false);
+        setIsLoading(false);
       } catch (e) {
         console.log('queryArticleCommentList---error', e);
       }
@@ -187,6 +293,14 @@ export default function ArticleDetail() {
     });
     Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);
+      if (!isUploadingImage.current) {
+        // 收起键盘的时候复原信息
+        setTextAreaPlaceHolder('');
+        commentLevel.current = 1;
+        replyArticleCommentId.current = '';
+        replyCommentSenderName.current = '';
+        replyLevel2ArticlCommentId.current = '';
+      }
     });
     return () => {
       Keyboard.removeAllListeners('keyboardDidShow');
@@ -200,9 +314,14 @@ export default function ArticleDetail() {
 
   const clickPicture = async () => {
     try {
+      isUploadingImage.current = true;
       const img = await uploadImage(false);
       setImageURL(`data:image/png;base64,${img.data}`);
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      isUploadingImage.current = true;
+      textAreaRef.current?.focus();
+    }
   };
 
   // 这里加上myInfo.id是为了让myInfo请求回来之后再展示个人信息，不然会渲染一版初始数据，闪烁
@@ -219,9 +338,14 @@ export default function ArticleDetail() {
           backgroundColor: 'white',
         }}
         onEndReached={() => {
-          if (isInit) return;
-          commentListPageInfo.pageNum++;
-          setCommentListPageInfo({ ...commentListPageInfo });
+          if (isLoading || commentList.length >= firstLevelArticleCommentCount)
+            return;
+          try {
+            commentListPageInfo.pageNum++;
+            setCommentListPageInfo({ ...commentListPageInfo });
+          } catch (e) {
+            console.log(e);
+          }
         }}
         ListHeaderComponent={
           <WingBlank>
@@ -242,8 +366,42 @@ export default function ArticleDetail() {
             <WhiteSpace></WhiteSpace>
           </WingBlank>
         }
+        ListFooterComponent={
+          // 有长度且加载中，说明是加载更多，显示loading
+          commentList.length && isLoading ? (
+            <View
+              style={{
+                height: 80,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <ActivityIndicator color="gray" size={30}></ActivityIndicator>
+            </View>
+          ) : // 占位符，不然直接改变容器高度显示loading会导致卡顿
+          commentList.length < firstLevelArticleCommentCount && !isLoading ? (
+            <View
+              style={{
+                height: 80,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}></View>
+          ) : // commentList.length为0的时候是empty形态
+          commentList.length !== 0 &&
+            commentList.length >= firstLevelArticleCommentCount ? (
+            <DefaultText
+              style={{
+                textAlign: 'center',
+                textAlignVertical: 'center',
+                paddingBottom: 20,
+                height: 80,
+                fontSize: 12,
+              }}>
+              - - - 到底了 - - -
+            </DefaultText>
+          ) : null
+        }
         ListEmptyComponent={
-          isInit ? (
+          isLoading ? (
             <View style={{ paddingTop: 80, alignItems: 'center' }}>
               <ActivityIndicator color="gray" size={30}></ActivityIndicator>
             </View>
@@ -262,6 +420,7 @@ export default function ArticleDetail() {
               paddingBottom: 10,
             }}>
             <CommentItem
+              clickComment={clickComment}
               commentItemData={item}
               updateCommentList={() => {
                 setCommentList([...commentList]);
@@ -307,7 +466,6 @@ export default function ArticleDetail() {
             }}></Icon>
           <Pressable
             onPress={() => {
-              Keyboard.dismiss();
               setIsPreviewImage(true);
             }}>
             <Image
@@ -339,10 +497,14 @@ export default function ArticleDetail() {
         <Pressable onPress={clickPicture}>
           <Icon name="picture" size={36} />
         </Pressable>
-        <TextAreaItem
+        <Input.TextArea
+          placeholder={textAreaPlaceHolder}
+          autoSize
+          ref={textAreaRef}
           value={contentValue}
-          onChange={value => setContentValue(value)}
-          autoHeight
+          onChange={e => {
+            setContentValue(e.target.value);
+          }}
           style={{
             width: screenWidth * 0.67,
             backgroundColor: 'white',
@@ -350,7 +512,7 @@ export default function ArticleDetail() {
             borderColor: 'rgba(0,0,0,0.3)',
             borderRadius: 10,
             marginHorizontal: 6,
-          }}></TextAreaItem>
+          }}></Input.TextArea>
         <BasicButton
           style={{ width: screenWidth * 0.15 }}
           fontSize={13}

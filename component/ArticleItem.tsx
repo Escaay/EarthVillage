@@ -5,8 +5,10 @@ import {
   Icon,
   Tabs,
   Toast,
+  Modal as AntdModal,
+  Input,
 } from '@ant-design/react-native';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Pressable, Image, Modal } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { useMyInfo } from '../store/myInfo';
@@ -16,6 +18,7 @@ import { queryUserBasis } from '../api/user';
 import { useRoute } from '@react-navigation/native';
 import {
   createArticleLike,
+  createTeamApplication,
   deleteArticleLike,
   updateArticle,
 } from '../api/article';
@@ -38,6 +41,7 @@ import basic from '../config/basic';
 import { useWebsocket } from '../store/websocket';
 import BasicButton from './BasicButton';
 import { opacity } from 'react-native-reanimated/lib/typescript/Colors';
+import useScreenSize from '../hook/useScreenSize';
 
 const CONTENT_PADDING_LEFT = 40 + 6; // 头像宽度+右margin
 
@@ -45,13 +49,38 @@ const ArticleItem = (props: any) => {
   const myInfo = useMyInfo();
   const route = useRoute();
   const websocket = useWebsocket();
+  const { screenWidth } = useScreenSize();
   const recommandArticleList = useRecommandArticleList();
   const sameCityArticleList = useSameCityArticleList();
   const navigation = useNavigation<any>();
+  const [isShowApplicationModal, setIsShowApplicationModal] = useState(false);
+  const applicationArticleInfo = useRef<any>({
+    articleId: '',
+    textContent: '',
+    articleTextContent: '',
+    articleFirstImageURL: '',
+  });
   const userArticleList = useUserArticleList();
   const { myArticleList, othersArticleList } = userArticleList;
   const isLogin = !!myInfo.id;
   const { articleItemData } = props;
+  const {
+    articleId,
+    commentNum,
+    articleLike,
+    gameName,
+    senderId,
+    textContent,
+    sender,
+    playTime,
+    peopleNum,
+    teamPeople,
+    viewNum,
+    imageUrlList,
+    tag,
+    createTime,
+    updateTime,
+  } = articleItemData;
   const clickAvatar = async (userId: string) => {
     if (!isLogin) {
       navigation.navigate('Login');
@@ -75,39 +104,60 @@ const ArticleItem = (props: any) => {
 
   const clickLike = async (
     articleId: string,
-    likeInfo: any,
+    articleLike: any,
     hasLike: boolean,
   ) => {
     try {
-      let newLikeInfo;
-      const newArticleLikeItem = {
+      let newArticleLike;
+      const newArticleLikeItem: any = {
         articleLikeId: uuidV4(),
         articleId,
-        articleSenderId: articleItemData.senderId,
-        articleTextContent: articleItemData.textContent,
+        articleSenderId: articleItemData.sender.id,
+        // articleTextContent: articleItemData.textContent,
         senderId: myInfo.id,
-        senderGender: myInfo.gender,
+        // article: {
+        //   sender: {
+        //     id: sender.id,
+        //     avatarURL: sender.avatarURL,
+        //     name: sender.name,
+        //     age: sender.age,
+        //     currentAddress: sender.currentAddress,
+        //     gender: sender.gender
+        //   },
+        // },
+        // sender: {
+        //   id: myInfo.id,
+        //   avatarURL: myInfo.avatarURL,
+        //   name: myInfo.name,
+        //   age: myInfo.age,
+        //   currentAddress: myInfo.currentAddress,
+        //   gender: myInfo.gender
+        // },
         isRead: false,
-        senderAge: myInfo.age,
-        senderCurrentAddress: myInfo.currentAddress,
-        senderAvatarURL: myInfo.avatarURL,
-        senderName: myInfo.name,
+        // sender.age: myInfo.age,
+        // senderCurrentAddress: myInfo.currentAddress,
+        // sender.avatarURL: myInfo.avatarURL,
+        // sender.name: myInfo.name,
         createTime: new Date(),
         updateTime: new Date(),
       };
       if (hasLike) {
-        newLikeInfo = likeInfo.filter(item => item.senderId !== myInfo.id);
+        newArticleLike = articleLike.filter(
+          item => item.sender.id !== myInfo.id,
+        );
       } else {
-        newLikeInfo = [
-          ...likeInfo,
+        newArticleLike = [
+          ...articleLike,
           {
             articleId,
-            senderId: newArticleLikeItem.senderId,
+            sender: {
+              id: myInfo.id,
+            },
             articleLikeId: newArticleLikeItem.articleLikeId,
           },
         ];
       }
-      articleItemData.likeInfo = newLikeInfo;
+      articleItemData.likeInfo = newArticleLike;
       // 匹配两个动态列表和用户文章列表中的笔记，如果存在则更新点赞信息
       const matchRecommandArticleItem = recommandArticleList?.find(
         item => item.articleId === articleItemData.articleId,
@@ -123,22 +173,22 @@ const ArticleItem = (props: any) => {
       );
 
       if (matchRecommandArticleItem) {
-        matchRecommandArticleItem.likeInfo = newLikeInfo;
+        matchRecommandArticleItem.articleLike = newArticleLike;
         setRecommandArticleList([...recommandArticleList]);
       }
 
       if (matchSameCityArticleItem) {
-        matchSameCityArticleItem.likeInfo = newLikeInfo;
+        matchSameCityArticleItem.articleLike = newArticleLike;
         setSameCityArticleList([...sameCityArticleList]);
       }
 
       if (matchMyArticleListItem) {
-        matchMyArticleListItem.likeInfo = newLikeInfo;
+        matchMyArticleListItem.articleLike = newArticleLike;
         setUserArticleList({ ...userArticleList });
       }
 
       if (matchOthersArticleList) {
-        matchOthersArticleList.likeInfo = newLikeInfo;
+        matchOthersArticleList.articleLike = newArticleLike;
         setUserArticleList({ ...userArticleList });
       }
 
@@ -146,20 +196,36 @@ const ArticleItem = (props: any) => {
       if (hasLike) {
         // 删除点赞记录
         await deleteArticleLike({
-          articleLikeId: likeInfo.find(item => item.senderId === myInfo.id)
+          articleLikeId: articleLike.find(item => item.sender.id === myInfo.id)
             .articleLikeId,
         });
       } else {
-        await createArticleLike(newArticleLikeItem);
+        const createArticleLikePayload = { ...newArticleLikeItem };
+        createArticleLikePayload.sender = {
+          connect: {
+            id: createArticleLikePayload.senderId,
+          },
+        };
+        createArticleLikePayload.article = {
+          connect: {
+            articleId: createArticleLikePayload.articleId,
+          },
+        };
+        delete createArticleLikePayload.senderId;
+        delete createArticleLikePayload.articleId;
+        await createArticleLike(createArticleLikePayload);
         // 发给websocket消息
-        websocket.send(
-          JSON.stringify({
-            type: 'likeArticle',
-            data: {
-              receiverId: newArticleLikeItem.articleSenderId,
-            },
-          }),
-        );
+        const receiverId = newArticleLikeItem.articleSenderId;
+        if (receiverId !== myInfo.id) {
+          websocket.send(
+            JSON.stringify({
+              type: 'likeArticle',
+              data: {
+                receiverId,
+              },
+            }),
+          );
+        }
       }
     } catch (e) {
       console.log(e);
@@ -169,39 +235,39 @@ const ArticleItem = (props: any) => {
   const [isPreviewImage, setIsPreviewImage] = useState(false);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<any[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
-  const {
-    articleId,
-    senderId,
-    senderAvatarURL,
-    senderName,
-    senderGender,
-    senderCurrentAddress,
-    senderAge,
-    likeInfo,
-    textContent,
-    maxPaticipant,
-    currentPaticipant,
-    imageUrlList,
-    createTime,
-    updateTime,
-    commentNum,
-    viewNum,
-    tag,
-    teamPeople,
-    peopleNum,
-    playTime,
-    gameName,
-  } = articleItemData;
+  // const {
+  //   articleId,
+  //   senderId,
+  //   sender.avatarURL,
+  //   sender.name,
+  //   sender.gender,
+  //   senderCurrentAddress,
+  //   sender.age,
+  //   likeInfo,
+  //   textContent,
+  //   maxPaticipant,
+  //   currentPaticipant,
+  //   imageUrlList,
+  //   createTime,
+  //   updateTime,
+  //   commentNum,
+  //   viewNum,
+  //   tag,
+  //   teamPeople,
+  //   peopleNum,
+  //   playTime,
+  //   gameName,
+  // } = articleItemData;
 
   const diaplayPlayTime = () => {
     const dayjsTime = dayjs(playTime);
     switch (Number(dayjsTime.day()) - Number(dayjs(new Date()).day())) {
       case 0:
-        return '今天' + dayjsTime.format('H:mm');
+        return '今天 ' + dayjsTime.format('H:mm');
       case 1:
-        return '明天' + dayjsTime.format('H:mm');
+        return '明天 ' + dayjsTime.format('H:mm');
       case 2:
-        return '后天' + dayjsTime.format('H:mm');
+        return '后天 ' + dayjsTime.format('H:mm');
       default:
         return dayjsTime.format('MM/DD H:mm');
     }
@@ -212,11 +278,109 @@ const ArticleItem = (props: any) => {
     navigation.navigate('Others', { userItem });
   };
 
-  const clickJoinTeam = articleId => {};
+  const clickJoinTeam = async (articleInfo: any) => {
+    applicationArticleInfo.current = {
+      ...applicationArticleInfo.current,
+      ...articleInfo,
+    };
+    setIsShowApplicationModal(true);
+  };
 
-  const hasLike = likeInfo.some(item => item.senderId === myInfo.id);
+  const sendApplication = async () => {
+    const {
+      textContent,
+      articleId,
+      arrticleTextContent,
+      articleFirstImageURL,
+    } = applicationArticleInfo.current;
+    const applicationId = uuidV4();
+    const status = 0;
+    // const newTeamApplication = {
+    //  applicationId,
+    //  applicantId: myInfo.id,
+    //   status,
+    //   article: {
+    //     arrticleTextContent,
+    //     articleFirstImageURL,
+    //     articleId
+    //   },
+    //   applicant: {
+    //     gender: myInfo.gender,
+    //     age: myInfo.age,
+    //     name: myInfo.name,
+    //     avatarURL: myInfo.avatarURL
+    //   }
+    // }
+    try {
+      await createTeamApplication({
+        receiverId: sender.id,
+        textContent,
+        article: {
+          connect: {
+            articleId,
+          },
+        },
+        applicationId,
+        status,
+        applicant: {
+          connect: {
+            id: myInfo.id,
+          },
+        },
+        isRead: false,
+      });
+      websocket.send(
+        JSON.stringify({
+          type: 'teamApplication',
+          data: {
+            receiverId: articleItemData.sender.id,
+          },
+        }),
+      );
+      Toast.success('申请组队成功');
+    } catch (e: any) {
+      Toast.info(e);
+      console.log(e);
+    } finally {
+      setIsShowApplicationModal(false);
+    }
+  };
+
+  const hasLike = articleLike.some(item => item.sender.id === myInfo.id);
   return (
     <>
+      <AntdModal
+        transparent
+        visible={isShowApplicationModal}
+        style={{ width: screenWidth * 0.9, borderRadius: 30 }}
+        maskClosable
+        onClose={() => setIsShowApplicationModal(false)}>
+        <Input.TextArea
+          // last
+          onChange={e =>
+            (applicationArticleInfo.current.textContent = e.target.value)
+          }
+          placeholder="申请信息"
+          rows={4}
+        />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            marginRight: 10,
+          }}>
+          <BasicButton
+            style={{ backgroundColor: 'gray' }}
+            onPress={() => setIsShowApplicationModal(false)}>
+            取消
+          </BasicButton>
+          <BasicButton
+            style={{ marginHorizontal: 8 }}
+            onPress={sendApplication}>
+            发送
+          </BasicButton>
+        </View>
+      </AntdModal>
       <Modal
         visible={isPreviewImage}
         transparent={true}
@@ -252,9 +416,9 @@ const ArticleItem = (props: any) => {
                 borderRadius: 20,
               }}
               source={
-                senderAvatarURL
+                sender.avatarURL
                   ? {
-                      uri: senderAvatarURL,
+                      uri: sender.avatarURL,
                     }
                   : require('../assets/img/avatar.png')
               }
@@ -273,20 +437,20 @@ const ArticleItem = (props: any) => {
                   fontWeight: 800,
                 }}
                 isCenter={true}>
-                {senderName}
+                {sender.name}
               </DefaultText>
               <DefaultText
                 style={{ fontSize: 12, marginRight: 2, color: 'black' }}
                 isCenter={true}>
-                {senderAge}
+                {sender.age}
               </DefaultText>
               <Icon
-                name={senderGender === '男' ? 'man' : 'woman'}
+                name={sender.gender === '男' ? 'man' : 'woman'}
                 style={{
                   textAlignVertical: 'center',
                   fontSize: 14,
                   color:
-                    senderGender === '男'
+                    sender.gender === '男'
                       ? basic.manIconColor
                       : basic.womanIconColor,
                 }}></Icon>
@@ -301,7 +465,7 @@ const ArticleItem = (props: any) => {
                   fontSize: 14,
                 }}></Icon>
               <DefaultText style={{ fontSize: 10 }} isCenter={true}>
-                {senderCurrentAddress
+                {sender.currentAddress
                   ?.filter(item => item !== '全部')
                   .join('-')}
               </DefaultText>
@@ -315,6 +479,22 @@ const ArticleItem = (props: any) => {
               # {tag}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
               {peopleNum ? '# ' + peopleNum + '人' : ''}
             </DefaultText>
+
+            {gameName ? (
+              <BasicButton
+                style={{
+                  color: 'gray',
+                  marginRight: 10,
+                  flex: 2,
+                  fontSize: 14,
+                  backgroundColor: 'rgb(255, 108, 55)',
+                  opacity: 0.8,
+                }}
+                height={20}>
+                {gameName}
+              </BasicButton>
+            ) : null}
+
             {playTime ? (
               <BasicButton
                 style={{
@@ -329,15 +509,46 @@ const ArticleItem = (props: any) => {
               </BasicButton>
             ) : null}
           </View>
-          <WhiteSpace></WhiteSpace>
-          <WhiteSpace></WhiteSpace>
+
           {teamPeople ? (
-            <View style={{ flexDirection: 'row' }}>
-              {teamPeople.map(item => (
+            <>
+              <WhiteSpace></WhiteSpace>
+              <WhiteSpace></WhiteSpace>
+              <View style={{ flexDirection: 'row' }}>
+                {teamPeople.map((item, index) => (
+                  <Pressable
+                    key={item ? item.peopleId : uuidV4()}
+                    onPress={() =>
+                      item ? clickPeopleAvatar(item.peopleId) : () => {}
+                    }>
+                    <Image
+                      style={{
+                        marginRight: 6,
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                      }}
+                      source={
+                        item && item.peopleAvatarURL
+                          ? {
+                              uri: item.peopleAvatarURL,
+                            }
+                          : index === 0
+                            ? require('../assets/img/avatar.png')
+                            : require('../assets/img/people.png')
+                      }
+                    />
+                  </Pressable>
+                ))}
                 <Pressable
-                  key={item ? item.peopleId : uuidV4()}
                   onPress={() =>
-                    item ? clickPeopleAvatar(item.peopleId) : () => {}
+                    clickJoinTeam({
+                      articleId,
+                      articleTextContent: textContent,
+                      articleFirstImageURL: imageUrlList?.length
+                        ? imageUrlList[0]
+                        : '',
+                    })
                   }>
                   <Image
                     style={{
@@ -346,30 +557,12 @@ const ArticleItem = (props: any) => {
                       height: 36,
                       borderRadius: 18,
                     }}
-                    source={
-                      item
-                        ? {
-                            uri: item.peopleAvatarURL,
-                          }
-                        : require('../assets/img/people.png')
-                    }
+                    source={require('../assets/img/joinTeam.png')}
                   />
                 </Pressable>
-              ))}
-              <Pressable onPress={() => clickJoinTeam(articleId)}>
-                <Image
-                  style={{
-                    marginRight: 6,
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                  }}
-                  source={require('../assets/img/joinTeam.png')}
-                />
-              </Pressable>
-            </View>
+              </View>
+            </>
           ) : null}
-          <WhiteSpace></WhiteSpace>
           <WhiteSpace></WhiteSpace>
           <WhiteSpace></WhiteSpace>
           <DefaultText style={{ color: 'black', fontSize: 14 }}>
@@ -387,9 +580,13 @@ const ArticleItem = (props: any) => {
                     height: 100,
                     borderRadius: 10,
                   }}
-                  source={{
-                    uri: item,
-                  }}
+                  source={
+                    item
+                      ? {
+                          uri: item,
+                        }
+                      : require('../assets/img/people.png')
+                  }
                 />
               </Pressable>
             ))}
@@ -400,10 +597,10 @@ const ArticleItem = (props: any) => {
               flexDirection: 'row',
               justifyContent: 'flex-start',
             }}>
-            <DefaultText style={{ flex: 4, fontSize: 12 }}>
+            <DefaultText style={{ flex: 1, fontSize: 12 }}>
               {publishDisplayTime(createTime)}
             </DefaultText>
-            <View style={{ flex: 3, flexDirection: 'row' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <View style={{ flexDirection: 'row', marginRight: 10 }}>
                 <Icon name="eye" color={undefined} style={{ fontSize: 21 }} />
                 <DefaultText isCenter={true} style={{ fontSize: 12 }}>
@@ -424,7 +621,7 @@ const ArticleItem = (props: any) => {
               </View>
               <Pressable
                 style={{ flexDirection: 'row', marginRight: 10 }}
-                onPress={() => clickLike(articleId, likeInfo, hasLike)}>
+                onPress={() => clickLike(articleId, articleLike, hasLike)}>
                 <Icon
                   name="like"
                   style={{ fontSize: 20 }}
@@ -432,7 +629,7 @@ const ArticleItem = (props: any) => {
                 />
                 <DefaultText isCenter={true} style={{ fontSize: 12 }}>
                   {' '}
-                  {likeInfo.length}
+                  {articleLike.length}
                 </DefaultText>
               </Pressable>
             </View>
