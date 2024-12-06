@@ -52,36 +52,57 @@ export default function LikeList(props: any) {
   const route = useRoute<any>();
   const flatListMinHeight = screenHeight - basic.headerHeight;
   const likeListRef = useRef<any>();
-  const [isInit, setIsInit] = useState(true);
+  const [likeListCount, setLikeListCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const [likeList, setLikeList] = useState([]);
   useEffect(() => {
     const helper = async () => {
-      await refreshlikeList();
-      setIsInit(false);
+      await loadLikeList();
+      setUnreadCount({ ...unreadCount, unreadLikeCount: 0 });
     };
     helper();
   }, []);
 
-  const refreshlikeList = async () => {
-    try {
-      // 拿最新的
-      const res = await queryLikeList({ userId: myInfo.id });
-      const newLikeList = [
-        ...res.data.articleLikeList,
-        ...res.data.articleCommentLikeList,
-      ];
+  const loadLikeList = async (isRefresh: boolean = false) => {
+    setIsLoading(true);
+    if (isRefresh) setLikeList([]);
+    const res = await queryLikeList({
+      userId: myInfo.id,
+      skip: isRefresh ? 0 : likeList.length,
+    });
+    const { likeList: newLikeList, likeListCount: newLikeListCount } = res.data;
+    setLikeList(newLikeList);
+    if (isRefresh) {
       setLikeList(newLikeList);
-
-      // 把用户文章的点赞信息全部设为已读
-      // const noRepeatNewArticleIdList = new Set();
-      // myArticleList.forEach(item =>
-      //   item.likeInfo.forEach(like => (like.isRead = true)),
-      // );
-      setUnreadCount({ ...unreadCount, unreadLikeCount: 0 });
-    } catch (e) {
-      console.log(e);
+    } else {
+      setLikeList([...likeList, ...newLikeList]);
     }
+    setLikeListCount(newLikeListCount);
+    setIsLoading(false);
   };
+
+  // const refreshlikeList = async () => {
+  //   try {
+  //     // 拿最新的
+  //     const res = await queryLikeList({
+  //       userId: myInfo.id,
+  //       skip: likeList.length,
+  //     });
+  //     const { likeList: newLikeList, likeListCount: newLikeListCount } =
+  //       res.data;
+
+  //     setLikeList(newLikeList);
+  //     setLikeListCount(newLikeListCount);
+
+  //     // 把用户文章的点赞信息全部设为已读
+  //     // const noRepeatNewArticleIdList = new Set();
+  //     // myArticleList.forEach(item =>
+  //     //   item.likeInfo.forEach(like => (like.isRead = true)),
+  //     // );
+  //   } catch (e) {
+  //     console.log(e);
+  //   }
+  // };
 
   const LikeItem = (props: any) => {
     const CONTENT_PADDING_LEFT = 40 + 6; // 头像宽度+右margin
@@ -98,6 +119,7 @@ export default function LikeList(props: any) {
       createTime,
       articleComment,
       updateTime,
+      articleCommentLikeId,
     } = articleLikeItemData;
     const { textContent } = articleComment ? articleComment : article;
     const clickAvatar = async (userId: string) => {
@@ -216,21 +238,50 @@ export default function LikeList(props: any) {
           minHeight: flatListMinHeight,
           backgroundColor: 'white',
         }}
-        ListEmptyComponent={
-          isInit ? (
+        ListFooterComponent={
+          // 有长度且加载中，说明是加载更多，显示loading
+          likeList.length && isLoading ? (
             <View
               style={{
-                paddingTop: flatListMinHeight * 0.45,
+                height: 80,
                 alignItems: 'center',
+                justifyContent: 'center',
               }}>
+              <ActivityIndicator color="gray" size={30}></ActivityIndicator>
+            </View>
+          ) : // 占位符，不然直接改变容器高度显示loading会导致卡顿
+          likeList.length < likeListCount && !isLoading ? (
+            <View
+              style={{
+                height: 80,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}></View>
+          ) : // likeList.length为0的时候是empty形态
+          likeList.length !== 0 && likeList.length >= likeListCount ? (
+            <DefaultText
+              style={{
+                textAlign: 'center',
+                textAlignVertical: 'center',
+                paddingBottom: 20,
+                height: 80,
+                fontSize: 12,
+              }}>
+              - - - 到底了 - - -
+            </DefaultText>
+          ) : null
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View
+              style={{ paddingTop: screenHeight * 0.4, alignItems: 'center' }}>
               <ActivityIndicator color="gray" size={30}></ActivityIndicator>
             </View>
           ) : (
             <DefaultText
               style={{
-                textAlign: 'center',
-                textAlignVertical: 'center',
-                height: flatListMinHeight,
+                marginHorizontal: 'auto',
+                marginTop: screenHeight * 0.4,
               }}>
               暂无数据
             </DefaultText>
@@ -238,11 +289,15 @@ export default function LikeList(props: any) {
         }
         refreshing={false}
         onRefresh={async () => {
-          await refreshlikeList();
+          await loadLikeList(true);
         }}
         onEndReached={() => {
-          // 进来的时候会触发一次，需要避免不必要请求，判读是否初始化
-          if (isInit) return;
+          if (isLoading || likeList.length >= likeListCount) return;
+          try {
+            loadLikeList();
+          } catch (e) {
+            console.log(e);
+          }
         }}
         style={{
           height: flatListMinHeight,
@@ -250,9 +305,7 @@ export default function LikeList(props: any) {
         data={likeList}
         renderItem={({ item }) => <LikeItem articleLikeItemData={item} />}
         keyExtractor={(item: any) =>
-          item.article.articleId +
-          (item.articleSenderId ?? 'comment') +
-          (item.commentSenderId ?? 'article')
+          item.articleLikeId ? item.articleLikeId : item.articleCommentLikeId
         }
       />
     </>
