@@ -19,30 +19,25 @@ import Setting from './pages/me/setting';
 import Chat from './pages/chat';
 import RouterGuard from './component/RouterGuard';
 import ChatDetail from './pages/chat/chatDetail/index.tsx';
-import CreateActivity from './pages/article/createArticle/index.tsx';
 import ArticleDetail from './pages/article/articleDetail/index.tsx';
-import Activity from './pages/activity/index.tsx';
 import Article from './pages/article/index.tsx';
 import CommentList from './pages/chat/commentList/index.tsx';
 import UserList from './pages/chat/userList/index.tsx';
 import CreateArticle from './pages/article/createArticle/index.tsx';
-import ActivityDetail from './pages/activity/activityDetail/index.tsx';
 import ProgressTips from './component/ProgressTips.tsx';
 import useUpdateEffect from './hook/useUpdateEffect.ts';
 import { useMyInfo, setMyInfo } from './store/myInfo.ts';
 import { setWebsocket, useWebsocket } from './store/websocket';
 import { queryUserBasis } from './api/user.ts';
 import wsConnect from './utils/websocket.ts';
+import { useUnreadCount, setUnreadCount } from './store/unreadCount.ts';
 import { queryChatList } from './api/user.ts';
 import { useChatList, setChatList } from './store/chatList.ts';
 import { queryMessagesByChatIds } from './api/user.ts';
-import { queryArticleUnReadCommentNum } from './api/article.ts';
+import { queryUnReadCommentNum, queryUnreadCount } from './api/article.ts';
 import { useMessagesList, setMessagesList } from './store/messagesList.ts';
 import websocketConfig from './config/websocket';
-import {
-  queryArticleList,
-  queryUnReadArticleLikeCount,
-} from './api/article.ts';
+import { queryArticleList, queryUnReadLikeNum } from './api/article.ts';
 import {
   useUserArticleList,
   setUserArticleList,
@@ -60,7 +55,7 @@ const pushyClient = new Pushy({
   // debug: true
 });
 Toast.config({
-  duration: 0.5,
+  duration: 1,
   mask: true,
   styles: { innerWrap: { backgroundColor: 'rgba(0,0,0,0.5)' } },
 });
@@ -90,16 +85,7 @@ const RouterGuardWithArticleDetail = () => (
     <ArticleDetail />
   </RouterGuard>
 );
-const RouterGuardWithCreateActivity = () => (
-  <RouterGuard>
-    <CreateActivity />
-  </RouterGuard>
-);
-const RouterGuardWithActivityDetail = () => (
-  <RouterGuard>
-    <ActivityDetail />
-  </RouterGuard>
-);
+
 const RouterGuardWithLikeList = () => (
   <RouterGuard>
     <LikeList />
@@ -123,92 +109,103 @@ const RouterGuardWithUserList = () => (
 
 const Tab = createBottomTabNavigator();
 
+function HomeTabsRouter() {
+  const unreadCount = useUnreadCount();
+  const totalUnReadCount =
+    unreadCount?.unreadMessageCount +
+    unreadCount?.unreadTeamApplicationCount +
+    unreadCount?.unreadLikeCount +
+    unreadCount?.unreadCommentCount;
+  return (
+    <Tab.Navigator
+      initialRouteName="Article"
+      screenOptions={({ route }) => ({
+        tabBarStyle: { height: basic.tabBarHeight },
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: any;
+
+          if (route.name === 'Home') {
+            iconName = 'reddit';
+          } else if (route.name === 'Me') {
+            iconName = 'aliwangwang';
+          } else if (route.name === 'Chat') {
+            iconName = 'message';
+            // } else if (route.name === 'Activity') {
+            //   iconName = 'home';
+          } else if (route.name === 'Article') {
+            iconName = 'home';
+          }
+
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: 'tomato',
+        tabBarInactiveTintColor: 'gray',
+      })}>
+      <Tab.Screen
+        name="Article"
+        options={{ title: '大厅', headerShown: false }}
+        component={Article}
+      />
+      <Tab.Screen
+        name="Home"
+        options={{ title: '搭子', headerShown: false }}
+        component={Home}
+      />
+      {/* <Tab.Screen
+          name="Activity"
+          options={{ title: '大厅', headerShown: false }}
+          component={Activity}
+        /> */}
+      <Tab.Screen
+        name="Chat"
+        options={{
+          title: '消息',
+          headerShown: false,
+          tabBarBadge: totalUnReadCount ? totalUnReadCount : undefined,
+        }}
+        component={Chat}
+      />
+      <Tab.Screen
+        name="Me"
+        options={{ title: '我', headerShown: false }}
+        component={Me}
+      />
+      {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
+    </Tab.Navigator>
+  );
+}
+
 export default function App() {
   const websocket = useWebsocket();
   const myInfo = useMyInfo();
   const chatList = useChatList();
+  const unreadCount = useUnreadCount();
   const messagesList = useMessagesList();
   const websocketRef = useRef<any>();
   const userArticleList = useUserArticleList();
   const userId = myInfo.id;
 
-  function HomeTabsRouter() {
-    const chatList = useChatList();
-    const totalUnReadCount =
-      chatList?.reduce((pre, cur) => {
-        if (cur.unReadCount) {
-          return pre + cur.unReadCount;
-        } else {
-          return pre;
-        }
-      }, 0) +
-      userArticleList?.unReadLikeCount +
-      userArticleList?.unReadCommentCount;
-    return (
-      <Tab.Navigator
-        initialRouteName="Activity"
-        screenOptions={({ route }) => ({
-          tabBarStyle: { height: basic.tabBarHeight },
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName: any;
-
-            if (route.name === 'Home') {
-              iconName = 'reddit';
-            } else if (route.name === 'Me') {
-              iconName = 'aliwangwang';
-            } else if (route.name === 'Chat') {
-              iconName = 'message';
-            } else if (route.name === 'Activity') {
-              iconName = 'home';
-            } else if (route.name === 'Article') {
-              iconName = 'read';
-            }
-
-            return <Icon name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: 'tomato',
-          tabBarInactiveTintColor: 'gray',
-        })}>
-        <Tab.Screen
-          name="Home"
-          options={{ title: '搭子', headerShown: false }}
-          component={Home}
-        />
-        <Tab.Screen
-          name="Article"
-          options={{ title: '动态', headerShown: false }}
-          component={Article}
-        />
-        <Tab.Screen
-          name="Activity"
-          options={{ title: '大厅', headerShown: false }}
-          component={Activity}
-        />
-        <Tab.Screen
-          name="Chat"
-          options={{
-            title: '消息',
-            headerShown: false,
-            tabBarBadge: totalUnReadCount ? totalUnReadCount : undefined,
-          }}
-          component={Chat}
-        />
-        <Tab.Screen
-          name="Me"
-          options={{ title: '我', headerShown: false }}
-          component={Me}
-        />
-        {/* 这里是TabScreen，直接使用路由守卫会导致删掉原来的HomeTabsRouter页面，因为Me没有单独的栈路由，所以只能在Me中单独守卫 */}
-      </Tab.Navigator>
-    );
-  }
-
+  const getUnreadCount = async () => {
+    const unreadCount = (await queryUnreadCount({ userId: myInfo.id })).data;
+    const {
+      articleCommentUnreadCount,
+      teamApplicationUnreadCount,
+      articleUnreadLikeCount,
+      articleCommentUnreadLikeCount,
+      messageListUnreadCount,
+    } = unreadCount;
+    setUnreadCount({
+      unreadLikeCount: articleUnreadLikeCount + articleCommentUnreadLikeCount,
+      unreadCommentCount: articleCommentUnreadCount,
+      unreadTeamApplicationCount: teamApplicationUnreadCount,
+      unreadMessageCount: messageListUnreadCount,
+    });
+  };
   // 这里相当于整个项目初始化的逻辑
   // 每次进应用看一下是否已有登录或者刷新token，更新登录信息
   useEffect(() => {
     const helper = async () => {
       const id = await storage.getItem('id');
-      console.log('id==-====', id);
       if (id) {
         try {
           const res = await queryUserBasis({ id });
@@ -265,6 +262,7 @@ export default function App() {
               userId,
             });
             setWebsocket(ws);
+            await getUnreadCount();
             // 重新拉取聊天列表，然后根据丢失的消息数量请求补充
             const newChatList = (await queryChatList({ userId: myInfo.id }))
               .data;
@@ -272,10 +270,17 @@ export default function App() {
             // 筛选出存在新消息的聊天项,包装成请求最新messages的参数
             const queryMessagesParams: any[] = [];
             newChatList.forEach((item, index) => {
-              // 原本的未读消息减去最新的未读消息，等于websocket断连丢失的消息数量
-              const lostMessageCount =
-                item.unReadCount - (chatList[index]?.unReadCount ?? 0);
-              if (item.unReadCount && lostMessageCount) {
+              // 最新的未读消息数量 - 原本的未读消息数量，等于websocket断连丢失的消息数量
+              let newUnreadCount, oldUnreadCount;
+              if (item.isSender) {
+                newUnreadCount = item.senderUnreadCount;
+                oldUnreadCount = chatList[index]?.senderUnreadCount;
+              } else {
+                newUnreadCount = item.receiverUnreadCount;
+                oldUnreadCount = chatList[index]?.receiverUnreadCount;
+              }
+              const lostMessageCount = newUnreadCount - oldUnreadCount;
+              if (lostMessageCount > 0) {
                 queryMessagesParams.push({
                   chatId: item.chatId,
                   take: lostMessageCount,
@@ -291,6 +296,7 @@ export default function App() {
                   new Date(a.lastMessageTime).getTime(),
               ),
             );
+
             // 如果没有新消息，就结束了
             if (!queryMessagesParams.length) return;
             const lostMessagesList = (
@@ -319,7 +325,7 @@ export default function App() {
   useEffect(() => {
     const wsOnMessage = async (event: any) => {
       const obj = JSON.parse(event.data);
-      console.log('接收服务端消息:');
+      console.log('接收服务端消息:', obj.type);
       const type = obj.type;
       switch (type) {
         case 'init':
@@ -327,44 +333,57 @@ export default function App() {
         case 'sendMessage':
           console.log('receive sendMessage');
           try {
-            const isPicture = (value: string) =>
-              value.startsWith('data:image/png;base64') && value.length > 1000;
-            const newMessage = obj.data;
-            const { content, chatId, shouldUpdateUnReadCount, createTime } =
-              obj.data;
-            const oldMessages = messagesList.find(
-              (item: any) => item.chatId === chatId,
-            );
-            // 多一个判断因为类型问题，其实oldMessages一定有的
-            if (oldMessages) {
-              oldMessages.messages = oldMessages?.messages.concat(newMessage);
-            }
-            console.log('接收新messagesList');
-            setMessagesList([...messagesList]);
+            // const isPicture = (value: string) =>
+            //   value.startsWith('data:image/png;base64') && value.length > 1000;
+            const {
+              newMessage,
+              newChatItem,
+              lastMessage,
+              lastMessageTime,
+              shouldAddUnreadCount,
+              isSender,
+            } = obj.data;
+            const { content, chatId, createTime } = newMessage;
+            if (newChatItem) {
+              // 创建chatItem
+              setChatList([newChatItem, ...chatList]);
+              setMessagesList([
+                { chatId: newChatItem.chatId, messages: [newMessage] },
+                ...messagesList,
+              ]);
+            } else {
+              // 更新chatItem
+              const chatItem = chatList?.find(item => item.chatId === chatId);
+              chatItem.lastMessage = lastMessage;
+              chatItem.lastMessageTime = lastMessageTime;
+              if (shouldAddUnreadCount) {
+                if (isSender) {
+                  chatItem.senderUnreadCount = chatItem.senderUnreadCount + 1;
+                } else {
+                  chatItem.receiverUnreadCount =
+                    chatItem.receiverUnreadCount + 1;
+                }
+              }
+              chatItem.lastMessageTime = lastMessageTime;
+              setChatList([...chatList]);
 
-            // 更新chatList
-            // 判断是否图片，是图片的话显示文字版图片
-            const lastMessage = isPicture(content) ? '【图片】' : content;
-            const chatItemData = chatList.find(
-              (item: any) => item.chatId === chatId,
-            );
-            chatItemData.lastMessage = lastMessage;
-            chatItemData.lastMessageTime = createTime;
-            // 根据websocket的信息决定是否更新未读信息，不要重新拉最新数据，浪费接口
-            // console.log('newChatItemData', newChatItemData)
-            // console.log('chatItemData', chatItemData)
-            if (shouldUpdateUnReadCount) {
-              chatItemData.unReadCount = chatItemData.unReadCount
-                ? chatItemData.unReadCount + 1
-                : 1;
+              // 更新消息列表
+              const oldMessages = messagesList.find(
+                (item: any) => item.chatId === chatId,
+              );
+              // 多一个判断因为类型问题，其实oldMessages一定有的
+              if (oldMessages) {
+                oldMessages.messages = oldMessages?.messages.concat(newMessage);
+              }
+              setMessagesList([...messagesList]);
             }
-            // 把最新消息放到消息列表首位
-            const newChatList = [
-              chatItemData,
-              ...chatList?.filter(item => item !== chatItemData),
-            ];
-            console.log('更新chatList');
-            setChatList(newChatList);
+
+            if (shouldAddUnreadCount) {
+              setUnreadCount({
+                ...unreadCount,
+                unreadMessageCount: unreadCount?.unreadMessageCount + 1,
+              });
+            }
           } catch (e) {
             console.log(e);
           }
@@ -384,10 +403,35 @@ export default function App() {
           } catch (e) {
             console.error(e);
           }
+        case 'likeArticle':
+          setUnreadCount({
+            ...unreadCount,
+            unreadLikeCount: unreadCount?.unreadLikeCount + 1,
+          });
+          break;
+        case 'likeArticleComment':
+          setUnreadCount({
+            ...unreadCount,
+            unreadLikeCount: unreadCount?.unreadLikeCount + 1,
+          });
+          break;
+        case 'sendComment':
+          setUnreadCount({
+            ...unreadCount,
+            unreadCommentCount: unreadCount?.unreadCommentCount + 1,
+          });
+          break;
+        case 'teamApplication':
+          setUnreadCount({
+            ...unreadCount,
+            unreadTeamApplicationCount:
+              unreadCount?.unreadTeamApplicationCount + 1,
+          });
+          break;
       }
     };
     if (websocket) websocket.onmessage = wsOnMessage;
-  }, [messagesList, chatList, websocket]);
+  }, [unreadCount, messagesList, chatList, websocket, userArticleList]);
 
   useUpdateEffect(() => {
     // 如果id和原来一样是不会触发更新的，所以修改个人信息不会导致更新
@@ -401,6 +445,12 @@ export default function App() {
           storage.setItem('refreshToken', '');
           setChatList([]);
           setMessagesList([]);
+          setUnreadCount({
+            unreadCommentCount: 0,
+            unreadLikeCount: 0,
+            unreadMessageCount: 0,
+            unreadTeamApplicationCount: 0,
+          });
           userArticleList.myArticleList = [];
           setUserArticleList({ ...userArticleList });
         } else {
@@ -425,27 +475,18 @@ export default function App() {
             item => (item.messages = item.messages.reverse()),
           );
           setMessagesList(newMessagesList);
-          const res = await queryArticleList({ userId: myInfo.id });
-          userArticleList.myArticleList = res.data;
-          const unReadCommentCount = (
-            await queryArticleUnReadCommentNum({ articleSenderId: myInfo.id })
-          ).data;
-          const unReadLikeCount = userArticleList.myArticleList.reduce(
-            (pre, cur) => {
-              return (
-                pre + cur.likeInfo.filter(item => item.isRead === false).length
-              );
-            },
-            0,
-          );
-          setUserArticleList({
-            ...userArticleList,
-            unReadLikeCount,
-            unReadCommentCount,
-          });
+          // const res = await queryArticleList({ userId: myInfo.id, isMyArticleList: true });
+          // userArticleList.myArticleList = res.data;
+          // const unreadCommentCount = (
+          //   await queryUnReadCommentNum({ userId: myInfo.id })
+          // ).data;
+          // const unreadLikeCount = (
+          //   await queryUnReadLikeNum({ userId: myInfo.id })
+          // ).data;
+          getUnreadCount();
         }
       } catch (e) {
-        console.log('e--', e);
+        console.log('e----', e);
       }
     };
     helper();
@@ -501,16 +542,6 @@ export default function App() {
               options={{ headerShown: false }}
               name="CreateArticle"
               component={RouterGuardWithCreateArticle}
-            />
-            <RouterStack.Screen
-              options={{ headerShown: false }}
-              name="ActivityDetail"
-              component={RouterGuardWithActivityDetail}
-            />
-            <RouterStack.Screen
-              options={{ headerShown: false }}
-              name="CreateActivity"
-              component={RouterGuardWithCreateActivity}
             />
             <RouterStack.Screen
               options={{ headerShown: false }}
