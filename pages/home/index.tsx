@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import {
@@ -19,7 +20,6 @@ import {
   WingBlank,
   Icon,
   Radio,
-  ActivityIndicator,
   Toast,
 } from '@ant-design/react-native';
 import websocketConfig from '../../config/websocket';
@@ -50,9 +50,9 @@ import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { getMessageList } from '../../store/messagesList';
 import DefaultText from '../../component/DefaultText';
-import { useUserId, setUserId } from '../../store/userId';
 import { setWebsocket, useWebsocket } from '../../store/websocket';
 import wsConnect from '../../utils/websocket';
+import useScreenSize from '../../hook/useScreenSize';
 
 const tabs = [
   {
@@ -65,16 +65,10 @@ const tabs = [
 
 export default function Home() {
   const route = useRoute();
-  const { StatusBarManager } = NativeModules;
-  const STATUS_BAR_HEIGHT =
-    Platform.OS === 'android'
-      ? StatusBar.currentHeight
-      : StatusBarManager.HEIGHT;
-  const { height: screenHeight, width: screenWidth } = useWindowDimensions();
+  const { screenHeight, screenWidth } = useScreenSize();
   const flatListMinHeight =
     screenHeight - basic.headerHeight - basic.tabBarHeight;
-  const userId = useUserId();
-  const isFirstLoading = useRef(true);
+  const [isInit, setIsInit] = useState(true);
   const websocket = useWebsocket();
   const [filterTotal, setFilterTotal] = useState(0);
   const [recommandTotal, setRecommandTotal] = useState(0);
@@ -87,13 +81,14 @@ export default function Home() {
   const chatList = useChatList();
   const messagesList = useMessagesList();
   const myInfo = useMyInfo();
-  const isLogin = !!userId;
+  const isLogin = !!myInfo.id;
   const navigation = useNavigation<any>();
   const [recommandUserList, setRecommandUserList] = useState<any[]>([]);
   const [filterUserList, setFilterUserList] = useState<any[]>([]);
   const recommandListRef = useRef<any>();
   const filterListRef = useRef<any>();
 
+  // 切换到搭子的时候myInfo的值已经定性了，不会拉取两次
   useEffect(() => {
     // 如果id和原来一样是不会触发更新的，所以修改个人信息不会导致更新
     try {
@@ -127,62 +122,38 @@ export default function Home() {
       currentAddress,
       status,
       customTags = [],
+      gameList = [],
     } = props.userData;
     const clickChat = async () => {
       try {
-        let newChatItemData: any = chatList?.find(
-          item => item.partnerId === id,
-        );
-        if (newChatItemData) {
-          navigation.navigate('ChatDetail', { chatItemData: newChatItemData });
+        let oldChatItemData: any = chatList?.find(item => {
+          if (item.isSender) {
+            return item.receiver.id === id;
+          } else {
+            return item.sender.id === id;
+          }
+        });
+        if (oldChatItemData) {
+          navigation.navigate('ChatDetail', {
+            chatItemData: oldChatItemData,
+          });
         } else {
           const lastMessageTime = new Date();
           const chatId = uuidv4();
-          newChatItemData = {
+          const newChatItemData = {
             chatId,
-            partnerId: id,
+            senderId: myInfo.id,
+            receiverId: id,
+            isSender: true,
+            receiver: props.userData,
             lastMessage: '',
+            senderUnreadCount: 0,
+            receiverUnreadCount: 0,
             lastMessageTime,
           };
           navigation.navigate('ChatDetail', {
-            chatItemData: { ...newChatItemData, partnerInfo: props.userData },
+            chatItemData: newChatItemData,
           });
-          const newChatList = [
-            { ...newChatItemData, partnerInfo: props.userData },
-            ...chatList,
-          ];
-
-          // 远端不需要伙伴信息，本地需要,远端返回的时候会自己拿id查询伙伴的个人信息
-          await updateChatList({
-            userId: myInfo.id,
-            chatList: [newChatItemData, ...chatList],
-          });
-
-          // 通知websocket替对方更新聊天列表
-          const newPartnerChatItemData = {
-            chatId,
-            partnerId: myInfo.id,
-            partnerInfo: myInfo,
-            lastMessage: '',
-            lastMessageTime,
-          };
-          websocket.send(
-            JSON.stringify({
-              type: 'createChat',
-              data: {
-                partnerId: id,
-                newPartnerChatItemData,
-              },
-            }),
-          );
-          setChatList(newChatList);
-          setMessagesList([
-            ...messagesList,
-            {
-              chatId,
-              messages: [],
-            },
-          ]);
         }
       } catch (e) {
         console.log(e);
@@ -193,43 +164,57 @@ export default function Home() {
       <Card full>
         <Card.Header
           title={
-            <View style={{ height: 100, justifyContent: 'center' }}>
+            <View style={{ height: 80, justifyContent: 'center' }}>
               <View
                 style={{
                   flexDirection: 'row',
-                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}>
-                <DefaultText style={{ fontSize: 13 }}>姓名：{name}</DefaultText>
-                <DefaultText style={{ fontSize: 13 }}>年龄：{age}</DefaultText>
-                <DefaultText style={{ fontSize: 13 }}>
-                  性别：{gender}
+                <DefaultText
+                  style={{
+                    fontSize: 14,
+                    color: 'black',
+                    fontWeight: 600,
+                    marginRight: 20,
+                  }}>
+                  {name}
                 </DefaultText>
+                <DefaultText style={{ fontSize: 13 }}>{age}</DefaultText>
+                <Icon
+                  name={gender === '男' ? 'man' : 'woman'}
+                  style={{
+                    fontSize: 16,
+                    color:
+                      gender === '男'
+                        ? basic.manIconColor
+                        : basic.womanIconColor,
+                  }}></Icon>
               </View>
               <WhiteSpace size="xs" />
               <WhiteSpace size="xs" />
-              <DefaultText style={{ fontSize: 13 }}>
+              {/* <DefaultText style={{ fontSize: 13 }}>
                 籍贯：
                 {originalAddress?.filter(item => item !== '全部').join('-')}
-              </DefaultText>
+              </DefaultText> */}
               <WhiteSpace size="xs" />
               <WhiteSpace size="xs" />
-              <DefaultText style={{ fontSize: 13 }}>
-                现居：
+              <DefaultText style={{ fontSize: 12 }}>
+                {/* 现居： */}
                 {currentAddress?.filter(item => item !== '全部').join('-')}
               </DefaultText>
-              <WhiteSpace size="xs" />
+              {/* <WhiteSpace size="xs" />
               <WhiteSpace size="xs" />
               <DefaultText style={{ fontSize: 13 }}>
                 目前状态：{status}
-              </DefaultText>
+              </DefaultText> */}
             </View>
           }
           thumb={
             <Image
               style={{
-                marginRight: 12,
-                width: 84,
-                height: 84,
+                marginRight: 20,
+                width: 70,
+                height: 70,
                 margin: 'auto',
                 borderRadius: 20,
               }}
@@ -256,7 +241,7 @@ export default function Home() {
                   alignContent: 'center',
                   minHeight: 60,
                 }}>
-                {customTags?.map((item: string, index: number) => (
+                {gameList?.map((item: string, index: number) => (
                   <Tag
                     key={item}
                     color={tagRgbaColor[index]}
@@ -272,9 +257,9 @@ export default function Home() {
           content={
             <View
               style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-              <BasicButton backgroundColor="pink" wingBlank={40}>
+              {/* <BasicButton backgroundColor="pink" wingBlank={40}>
                 交换微信
-              </BasicButton>
+              </BasicButton> */}
               <BasicButton
                 backgroundColor="orange"
                 wingBlank={40}
@@ -301,7 +286,12 @@ export default function Home() {
 
   // 封装了过滤操作
   const refreshFilterList = async () => {
-    console.log('refreshFilterList');
+    if (filterPageNum.num === 1) {
+      filterListRef.current?.scrollToOffset({
+        animated: false,
+        offset: 0,
+      });
+    }
     if (!myInfo.id) {
       setFilterUserList([]);
       setFilterTotal(0);
@@ -332,16 +322,23 @@ export default function Home() {
   };
 
   const extendRecommandList = async () => {
-    console.log('extendRecommandList');
     try {
       // 后面改成请求推荐算法的接口，和filter分开
-      let key;
-      if (isFirstLoading.current) {
-        key = Toast.loading({
-          content: <></>,
+      // let key;
+      // if (isFirstLoading.current) {
+      //   key = Toast.loading({
+      //     duration: 0,
+      //     content: <></>,
+      //   });
+      // }
+      // 已登录推荐算法：推荐年龄上下浮动五岁的
+
+      if (recommandPageNum.num === 1) {
+        recommandListRef.current?.scrollToOffset({
+          animated: false,
+          offset: 0,
         });
       }
-      // 已登录推荐算法：推荐年龄上下浮动五岁的
 
       const payload: any = {
         pageInfo: {
@@ -361,10 +358,11 @@ export default function Home() {
       } else {
         setRecommandUserList(res.data.userBasisList);
       }
-      if (isFirstLoading.current) {
-        Toast.remove(key);
-        isFirstLoading.current = false;
-      }
+      setIsInit(false);
+      // if (isFirstLoading.current) {
+      //   Toast.remove(key);
+      //   isFirstLoading.current = false;
+      // }
     } catch (e) {
       console.log(e);
     }
@@ -424,14 +422,33 @@ export default function Home() {
           }}
           refreshing={false}
           onEndReached={() => {
-            // 一进来会自动触发一次到达底部，导致不必要的请求，需要判读一下长度
-            console.log('到达底部', recommandUserList.length);
-            if (recommandUserList.length)
-              setRecommandPageNum({ num: recommandPageNum.num + 1 });
+            // 进来的时候会触发一次，需要避免不必要请求，判读是否初始化
+            if (isInit) return;
+            setRecommandPageNum({ num: recommandPageNum.num + 1 });
           }}
           onRefresh={async () => {
             setRecommandPageNum({ num: 1 });
           }}
+          ListEmptyComponent={
+            isInit ? (
+              <View
+                style={{
+                  paddingTop: flatListMinHeight * 0.45,
+                  alignItems: 'center',
+                }}>
+                <ActivityIndicator color="gray" size={30}></ActivityIndicator>
+              </View>
+            ) : (
+              <DefaultText
+                style={{
+                  textAlign: 'center',
+                  textAlignVertical: 'center',
+                  height: flatListMinHeight,
+                }}>
+                暂无数据
+              </DefaultText>
+            )
+          }
           data={recommandUserList}
           renderItem={({ item }) => <UserItem userData={item} />}
           keyExtractor={(item: any) => item.id}
@@ -449,14 +466,24 @@ export default function Home() {
           }}
           ListFooterComponentStyle={{ height: 60 }}
           ListEmptyComponent={
-            <DefaultText
-              style={{
-                textAlign: 'center',
-                textAlignVertical: 'center',
-                height: flatListMinHeight,
-              }}>
-              暂无数据
-            </DefaultText>
+            isInit ? (
+              <View
+                style={{
+                  paddingTop: flatListMinHeight * 0.45,
+                  alignItems: 'center',
+                }}>
+                <ActivityIndicator color="gray" size={30}></ActivityIndicator>
+              </View>
+            ) : (
+              <DefaultText
+                style={{
+                  textAlign: 'center',
+                  textAlignVertical: 'center',
+                  height: flatListMinHeight,
+                }}>
+                暂无数据
+              </DefaultText>
+            )
           }
           ListFooterComponent={
             <Pagination
