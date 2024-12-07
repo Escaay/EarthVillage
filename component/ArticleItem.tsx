@@ -67,9 +67,9 @@ const ArticleItem = (props: any) => {
   const {
     articleId,
     commentNum,
+    articleComment,
     articleLike,
     gameName,
-    senderId,
     textContent,
     sender,
     playTime,
@@ -82,15 +82,15 @@ const ArticleItem = (props: any) => {
     updateTime,
   } = articleItemData;
   const clickAvatar = async (userId: string) => {
-    if (!isLogin) {
-      navigation.navigate('Login');
-      return;
+    try {
+      const userItem = (await queryUserBasis({ id: userId })).data;
+      navigation.navigate('Others', {
+        userItem,
+        originPage: route.name,
+      });
+    } catch (e) {
+      console.log(e);
     }
-    const userItem = (await queryUserBasis({ id: userId })).data;
-    navigation.navigate('Others', {
-      userItem,
-      originPage: route.name,
-    });
   };
 
   const clickPicture = async (pictureIndex: number) => {
@@ -108,6 +108,10 @@ const ArticleItem = (props: any) => {
     hasLike: boolean,
   ) => {
     try {
+      if (!isLogin) {
+        navigation.navigate('Login');
+        return;
+      }
       let newArticleLike;
       const newArticleLikeItem: any = {
         articleLikeId: uuidV4(),
@@ -279,6 +283,10 @@ const ArticleItem = (props: any) => {
   };
 
   const clickJoinTeam = async (articleInfo: any) => {
+    if (!isLogin) {
+      navigation.navigate('Login');
+      return;
+    }
     applicationArticleInfo.current = {
       ...applicationArticleInfo.current,
       ...articleInfo,
@@ -407,7 +415,7 @@ const ArticleItem = (props: any) => {
 
       <Pressable onPress={() => clickArticleCard(articleItemData)}>
         <View style={{ flexDirection: 'row', marginBottom: 15 }}>
-          <Pressable onPress={() => clickAvatar(senderId)}>
+          <Pressable onPress={() => clickAvatar(sender.id)}>
             <Image
               style={{
                 marginRight: 6,
@@ -514,7 +522,7 @@ const ArticleItem = (props: any) => {
             <>
               <WhiteSpace></WhiteSpace>
               <WhiteSpace></WhiteSpace>
-              <View style={{ flexDirection: 'row' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {teamPeople.map((item, index) => (
                   <Pressable
                     key={item ? item.peopleId : uuidV4()}
@@ -540,26 +548,39 @@ const ArticleItem = (props: any) => {
                     />
                   </Pressable>
                 ))}
-                <Pressable
-                  onPress={() =>
-                    clickJoinTeam({
-                      articleId,
-                      articleTextContent: textContent,
-                      articleFirstImageURL: imageUrlList?.length
-                        ? imageUrlList[0]
-                        : '',
-                    })
-                  }>
-                  <Image
+                {teamPeople.filter(item => item !== '').length < peopleNum ? (
+                  <Pressable
+                    onPress={() =>
+                      clickJoinTeam({
+                        articleId,
+                        articleTextContent: textContent,
+                        articleFirstImageURL: imageUrlList?.length
+                          ? imageUrlList[0]
+                          : '',
+                      })
+                    }>
+                    <Image
+                      style={{
+                        marginRight: 6,
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                      }}
+                      source={require('../assets/img/joinTeam.png')}
+                    />
+                  </Pressable>
+                ) : (
+                  <DefaultText
                     style={{
-                      marginRight: 6,
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
+                      color: 'gray',
+                      marginLeft: 6,
+                      fontSize: 14,
+                      opacity: 0.8,
                     }}
-                    source={require('../assets/img/joinTeam.png')}
-                  />
-                </Pressable>
+                    height={20}>
+                    组队成功
+                  </DefaultText>
+                )}
               </View>
             </>
           ) : null}
@@ -616,7 +637,7 @@ const ArticleItem = (props: any) => {
                 />
                 <DefaultText isCenter={true} style={{ fontSize: 12 }}>
                   {' '}
-                  {commentNum}
+                  {articleComment.length}
                 </DefaultText>
               </View>
               <Pressable
