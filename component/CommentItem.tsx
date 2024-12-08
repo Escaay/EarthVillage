@@ -47,12 +47,16 @@ const CommentItem = (props: any) => {
     imageURL,
     level,
     replyCommentCount,
-    replyComment,
+    replyComment, // 动态评论列表下的
+    replyCommentInfo, // 用户评论列表下的
     articleCommentLike,
   } = commentItemData;
   const articleImageURL = article?.imageUrlList?.[0];
   const isLiked = articleCommentLike.some(item => item.sender.id === myInfo.id);
   const loadReplyComment = async () => {
+    const key = Toast.loading({
+      content: <></>,
+    });
     const moreReplyCommentData = (
       await queryReplyCommentList({
         replyArticleCommentId: articleCommentId,
@@ -61,6 +65,7 @@ const CommentItem = (props: any) => {
     ).data;
     commentItemData.replyComment = [...replyComment, ...moreReplyCommentData];
     updateCommentList();
+    Toast.remove(key);
   };
 
   const ReplyComment = (props: any) => {
@@ -69,7 +74,7 @@ const CommentItem = (props: any) => {
     const {
       articleCommentId: replyArticleCommentId,
       sender,
-      textContent,
+      textContent: replyCommentTextContent,
       article,
       createTime,
       imageURL,
@@ -244,7 +249,7 @@ const CommentItem = (props: any) => {
             </DefaultText>
             <DefaultText style={{ color: 'black', fontSize: 12 }}>
               {replyCommentSenderName ? ` ：` : ''}
-              {textContent}
+              {replyCommentTextContent}
             </DefaultText>
           </View>
 
@@ -481,12 +486,7 @@ const CommentItem = (props: any) => {
       <Pressable
         onPress={async () => {
           if (route.name === 'ArticleDetail') {
-            return clickComment(
-              sender.name,
-              level,
-              articleCommentId,
-              replyArticleCommentId,
-            );
+            return clickComment(sender.name, level, articleCommentId);
           }
           if (route.name === 'CommentList') {
             const key = Toast.loading({
@@ -505,76 +505,21 @@ const CommentItem = (props: any) => {
         {route.name === 'ArticleDetail' ? null : (
           <>
             <DefaultText style={{ color: 'gray', fontSize: 12 }}>
-              {level === 1 ? '评论了你的动态' : '回复了你的评论'}
+              {!!replyCommentInfo ? '回复了你的评论' : '评论了你的动态'}
             </DefaultText>
-            {!articleImageURL ? <WhiteSpace></WhiteSpace> : null}
+            {!articleImageURL ? (
+              <>
+                <WhiteSpace></WhiteSpace>
+              </>
+            ) : null}
+            <WhiteSpace></WhiteSpace>
+            <WhiteSpace></WhiteSpace>
           </>
         )}
 
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-          <DefaultText style={{ color: 'gray', fontSize: 12 }}>
-            {textContent}
-          </DefaultText>
-
-          {articleImageURL ? (
-            <View style={{ backgroundColor: 'white', marginRight: 30 }}>
-              <Modal
-                visible={isPreviewArticleImage}
-                transparent={true}
-                onRequestClose={() => setIsPreviewArticleImage(false)}>
-                <ImageViewer
-                  onClick={() => setIsPreviewArticleImage(false)}
-                  index={0}
-                  saveToLocalByLongPress
-                  onSaveToCamera={() => {
-                    Toast.info('保存成功');
-                  }}
-                  menuContext={{
-                    saveToLocal: '保存至手机',
-                    cancel: '取消',
-                  }}
-                  imageUrls={[{ url: articleImageURL }]}
-                />
-              </Modal>
-              <Pressable onPress={() => setIsPreviewArticleImage(true)}>
-                <Image
-                  style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 10,
-                  }}
-                  source={{
-                    uri: articleImageURL,
-                  }}
-                />
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
-        {route.name === 'ArticleDetail' ? null : (
-          <>
-            {!articleImageURL ? <WhiteSpace></WhiteSpace> : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View
-                style={{
-                  backgroundColor: 'rgba(45, 45, 45, 0.1)',
-                  width: 8,
-                  height: 20,
-                  marginRight: 6,
-                  borderRadius: 5,
-                }}></View>
-              <DefaultText style={{ color: 'gray', fontSize: 12 }}>
-                {article.textContent}
-              </DefaultText>
-            </View>
-          </>
-        )}
+        <DefaultText style={{ color: 'black', fontSize: 12 }}>
+          {textContent}
+        </DefaultText>
         <WhiteSpace></WhiteSpace>
         {imageURL ? (
           <View style={{ backgroundColor: 'white' }}>
@@ -596,7 +541,13 @@ const CommentItem = (props: any) => {
                 imageUrls={[{ url: imageURL }]}
               />
             </Modal>
-            <Pressable onPress={() => setIsPreviewImage(true)}>
+            <Pressable
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: 10,
+              }}
+              onPress={() => setIsPreviewImage(true)}>
               <Image
                 style={{
                   width: 80,
@@ -610,6 +561,115 @@ const CommentItem = (props: any) => {
             </Pressable>
           </View>
         ) : null}
+
+        {route.name === 'ArticleDetail' ? null : (
+          <>
+            {!articleImageURL ? <WhiteSpace></WhiteSpace> : null}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(45, 45, 45, 0.1)',
+                    width: 8,
+                    height: 20,
+                    marginRight: 6,
+                    borderRadius: 5,
+                  }}></View>
+                <DefaultText style={{ color: 'gray', fontSize: 12 }}>
+                  {replyCommentInfo
+                    ? replyCommentInfo.textContent
+                    : article.textContent}
+                </DefaultText>
+              </View>
+
+              {replyCommentInfo && replyCommentInfo.imageURL ? (
+                <View style={{ backgroundColor: 'white', marginRight: 20 }}>
+                  <Modal
+                    visible={isPreviewArticleImage}
+                    transparent={true}
+                    onRequestClose={() => setIsPreviewArticleImage(false)}>
+                    <ImageViewer
+                      onClick={() => setIsPreviewArticleImage(false)}
+                      index={0}
+                      saveToLocalByLongPress
+                      onSaveToCamera={() => {
+                        Toast.info('保存成功');
+                      }}
+                      menuContext={{
+                        saveToLocal: '保存至手机',
+                        cancel: '取消',
+                      }}
+                      imageUrls={[{ url: replyCommentInfo.imageURL }]}
+                    />
+                  </Modal>
+                  <Pressable
+                    style={{ width: 50, height: 50, borderRadius: 10 }}
+                    onPress={() => setIsPreviewArticleImage(true)}>
+                    <Image
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 10,
+                      }}
+                      source={{
+                        uri: replyCommentInfo.imageURL,
+                      }}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {!replyCommentInfo && articleImageURL ? (
+                <View style={{ backgroundColor: 'white', marginRight: 20 }}>
+                  <Modal
+                    visible={isPreviewArticleImage}
+                    transparent={true}
+                    onRequestClose={() => setIsPreviewArticleImage(false)}>
+                    <ImageViewer
+                      onClick={() => setIsPreviewArticleImage(false)}
+                      index={0}
+                      saveToLocalByLongPress
+                      onSaveToCamera={() => {
+                        Toast.info('保存成功');
+                      }}
+                      menuContext={{
+                        saveToLocal: '保存至手机',
+                        cancel: '取消',
+                      }}
+                      imageUrls={[{ url: articleImageURL }]}
+                    />
+                  </Modal>
+                  <Pressable
+                    style={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 10,
+                    }}
+                    onPress={() => setIsPreviewArticleImage(true)}>
+                    <Image
+                      style={{
+                        width: 50,
+                        height: 50,
+                        borderRadius: 10,
+                      }}
+                      source={{
+                        uri: articleImageURL,
+                      }}
+                    />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </>
+        )}
+
         <WhiteSpace></WhiteSpace>
         <View style={{ flexDirection: 'row' }}>
           <DefaultText style={{ flex: 4, fontSize: 12 }}>
