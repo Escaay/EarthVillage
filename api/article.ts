@@ -85,3 +85,43 @@ export const queryArticleItem = async (payload: any) => {
   const res = await axios.post('/article/queryArticleItem', payload);
   return res;
 };
+
+export const createTeamApplication = async (payload: any) => {
+  const res = await axios.post('/article/createTeamApplication', payload);
+  return res;
+};
+
+export const queryTeamApplicationList = async (payload: any) => {
+  const res = await axios.post('/article/queryTeamApplicationList', payload);
+  return res;
+};
+
+export const queryUnReadApplicationNum = async (payload: any) => {
+  const res = await axios.post('/article/queryUnReadApplicationNum', payload);
+  return res;
+};
+
+export const queryUnreadCount = async (payload: any) => {
+  const res = await axios.post('/article/queryUnreadCount', payload);
+  return res;
+};
+
+export const qeuryUserCommentList = async (payload: any) => {
+  const res = await axios.post('/article/qeuryUserCommentList', payload);
+  return res;
+};
+
+export const queryReplyCommentList = async (payload: any) => {
+  const res = await axios.post('/article/queryReplyCommentList', payload);
+  return res;
+};
+
+export const updateTeamApplication = async (payload: any) => {
+  const res = await axios.post('/article/updateTeamApplication', payload);
+  return res;
+};
+
+export const updateArticleItem = async (payload: any) => {
+  const res = await axios.post('/article/updateArticleItem', payload);
+  return res;
+};

@@ -40,7 +40,6 @@ import {
 import basic from '../config/basic';
 import { useWebsocket } from '../store/websocket';
 import BasicButton from './BasicButton';
-import { opacity } from 'react-native-reanimated/lib/typescript/Colors';
 import useScreenSize from '../hook/useScreenSize';
 
 const CONTENT_PADDING_LEFT = 40 + 6; // 头像宽度+右margin
